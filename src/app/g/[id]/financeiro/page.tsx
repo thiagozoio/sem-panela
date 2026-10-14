@@ -98,7 +98,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         <input type="hidden" name="amount_cents" value={row.amountCents} />
         <input type="hidden" name="payment_id" value={row.payment?.id ?? ""} />
         <span className="text-neutral-500">{formatMoney(row.payment?.amount_cents ?? row.amountCents)}</span>
-        <Button variant={row.payment ? "primary" : "secondary"} className="w-24 px-3 py-1.5" disabled={readOnly}>
+        <Button variant={row.payment ? "primary" : "secondary"} className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly}>
           {row.payment ? "Pago ✓" : "Marcar pago"}
         </Button>
       </form>
