@@ -1,69 +1,48 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+import { LinkButton } from "@/components/ui";
+import { getCurrentUser } from "@/lib/auth";
+import { formatMoney } from "@/lib/format";
+import { PRICE_CENTS } from "@/lib/subscription";
 
-export default function Home() {
+const features = [
+  ["📋", "Lista de presença", "O jogador confirma com um toque. Lotou? Vai para a lista de espera, com prioridade para mensalista."],
+  ["⚖️", "Times sem panelinha", "Sorteio equilibrado pelo nível de cada um, com um goleiro por time. Não gostou? Sorteia de novo."],
+  ["💰", "Quem pagou, quem deve", "Mensalidade e avulso marcados num lugar só, com a cobrança pronta para mandar no grupo."],
+  ["📲", "Tudo pelo WhatsApp", "Um link no grupo e pronto. Funciona no navegador do celular, sem baixar nada."],
+];
+
+export default async function Home() {
+  if (await getCurrentUser()) redirect("/grupos");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="flex flex-1 flex-col">
+      <section className="bg-pitch-700 px-4 pb-12 pt-14 text-white">
+        <div className="mx-auto max-w-xl space-y-5">
+          <p className="text-sm font-semibold uppercase tracking-widest text-pitch-100">Sem Panela ⚽</p>
+          <h1 className="text-3xl font-extrabold leading-tight">A pelada organizada e paga em dia.</h1>
+          <p className="text-pitch-100">
+            Lista de presença, sorteio de times equilibrados e controle de quem pagou, tudo num link para o grupo do WhatsApp.
           </p>
+          <div className="flex flex-wrap gap-3">
+            <LinkButton href="/login?next=/grupos/novo" variant="secondary">Criar minha pelada</LinkButton>
+            <LinkButton href="/login" className="ring-1 ring-white/40">Já tenho conta</LinkButton>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+      <section className="mx-auto grid w-full max-w-xl gap-3 px-4 py-8">
+        {features.map(([icon, title, text]) => (
+          <div key={title} className="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-black/5">
+            <span className="text-2xl">{icon}</span>
+            <div>
+              <h2 className="font-semibold">{title}</h2>
+              <p className="text-sm text-neutral-600">{text}</p>
+            </div>
+          </div>
+        ))}
+        <p className="pt-4 text-center text-sm text-neutral-600">
+          30 dias grátis. Depois, <strong>{formatMoney(PRICE_CENTS)} por mês</strong> por grupo, com jogadores ilimitados. Só o organizador paga.
+        </p>
+      </section>
+    </main>
   );
 }

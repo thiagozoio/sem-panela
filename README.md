@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sem Panela ⚽
 
-## Getting Started
+A pelada organizada e paga em dia: lista de presença com lista de espera, sorteio de times equilibrados e controle de quem pagou, num link para o grupo do WhatsApp.
 
-First, run the development server:
+App web (PWA) em **Next.js 16 + Supabase**, hospedado na **Vercel**.
+
+## O que tem no MVP
+
+| Tela | O que faz |
+|---|---|
+| `/login` | Login sem senha: link mágico **ou** código de 6 dígitos por e-mail |
+| `/grupos` | Peladas do usuário; criar nova pelada (30 dias grátis) |
+| `/convite/[código]` | Entrar na pelada pelo link do WhatsApp; pode assumir um cadastro feito pelo organizador |
+| `/g/[id]` | Próximo jogo: Vou / Não vou, lista de espera, prioridade de mensalista, sorteio de times e envio para o WhatsApp |
+| `/g/[id]/jogadores` | Cadastro de jogadores: posição, nível 1–5 (só o organizador vê), mensalista ou avulso |
+| `/g/[id]/financeiro` | Mensalidades e avulsos por mês, quem deve e mensagem de cobrança pronta |
+| `/g/[id]/config` | Ajustes, valores, chave Pix, link de convite e status da assinatura |
+| `/admin` | Para o dono do SaaS: lista de grupos e marcação manual do "pago até" |
+
+### Regras
+- **Próximo jogo**: criado automaticamente pelo dia/horário do grupo; continua aberto até 3h depois do início e então abre a lista da semana seguinte.
+- **Lista de espera**: quem confirma depois de lotar espera; quando alguém desiste, o primeiro da espera sobe sozinho.
+- **Prioridade**: mensalista que confirma até `priority_hours` (padrão 24h) antes do jogo passa na frente dos avulsos.
+- **Sorteio** (`src/lib/draw.ts`): um goleiro por time, linha distribuída por nível e depois trocas que reduzem a diferença entre os times.
+- **Assinatura**: R$ 19,90/mês por grupo, Pix manual para o dono. O banco guarda `groups.paid_until`; 7 dias depois do vencimento o grupo fica **só leitura** (garantido pela RLS).
+
+## Rodando localmente
 
 ```bash
+npm install
+cp .env.example .env.local   # preencha com os dados do Supabase
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Testes e checagens:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test          # sorteio, lista de espera, datas e assinatura
+npm run typecheck
+npm run lint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configurando o Supabase (uma vez)
 
-## Learn More
+1. Crie um projeto na região **South America (São Paulo)**.
+2. No **SQL Editor**, rode `supabase/migrations/20261014000000_init.sql` (ou `supabase db push` com a CLI).
+3. **Authentication > URL Configuration**: `Site URL` = URL do app (ex.: `https://sempanela.vercel.app`) e adicione `https://sempanela.vercel.app/**` e `http://localhost:3000/**` em *Redirect URLs*.
+4. **Authentication > Email Templates**, nos modelos *Magic Link* e *Confirm signup*, troque o corpo por algo assim (o link funciona até aberto em outro navegador, e o código serve para quem está no app instalado):
 
-To learn more about Next.js, take a look at the following resources:
+   ```html
+   <h2>Seu acesso ao Sem Panela</h2>
+   <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Entrar no Sem Panela</a></p>
+   <p>Ou digite o código: <strong>{{ .Token }}</strong></p>
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+5. Para virar admin, depois do primeiro login rode no SQL Editor:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```sql
+   update public.profiles set is_admin = true
+   where id = (select id from auth.users where email = 'seu@email.com');
+   ```
 
-## Deploy on Vercel
+O e-mail padrão do Supabase tem limite baixo de envios por hora; para produção configure um SMTP (ex.: Resend) em **Authentication > SMTP Settings**.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy na Vercel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Importe o repositório na Vercel (região `gru1`, São Paulo, em *Settings > Functions*).
+2. Cadastre as variáveis do `.env.example` em *Settings > Environment Variables*.
+3. Cada push na `main` publica sozinho.
+
+## Estrutura
+
+```
+supabase/migrations/   esquema, RLS e funções do banco
+src/proxy.ts           renova a sessão do Supabase a cada requisição
+src/lib/               regras puras (sorteio, lista, datas, assinatura) + acesso a dados
+src/app/               telas (App Router) e server actions
+```
+
+## Próximos passos (fora do MVP)
+- Cobrança automática da assinatura pelo Asaas (o campo `paid_until` já é o ponto de integração: o webhook só precisa atualizá-lo).
+- Pix da turma com baixa automática, placar e artilharia, notificações.
