@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { AppShell } from "@/components/app-shell";
 import { Card, Field, Input, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
-import { getCurrentUser, safeNext } from "@/lib/auth";
+import { getCurrentUser, getSessionUser, safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Perfil" };
@@ -14,10 +14,10 @@ async function saveProfile(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim().slice(0, 60);
   const next = safeNext(formData.get("next"));
   if (!name) return;
+  const session = await getSessionUser();
+  if (!session) redirect("/login");
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
-  await supabase.from("profiles").update({ name }).eq("id", data.user.id);
+  await supabase.from("profiles").update({ name }).eq("id", session.id);
   refresh();
   redirect(next);
 }

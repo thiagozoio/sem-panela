@@ -5,18 +5,28 @@ import { createClient } from "./supabase/server";
 
 export type CurrentUser = { id: string; email: string; name: string; isAdmin: boolean };
 
-export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+/** Usuário da sessão, só pelo token (sem ida ao servidor de login). */
+export const getSessionUser = cache(async (): Promise<{ id: string; email: string } | null> => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return null;
+  // getClaims confere a assinatura do token localmente (chaves assimétricas do Supabase),
+  // evitando a ida e volta ao servidor de login que o getUser faria em toda página.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : "" };
+});
+
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await getSessionUser();
+  if (!session) return null;
+  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("name, is_admin")
-    .eq("id", data.user.id)
+    .eq("id", session.id)
     .maybeSingle();
   return {
-    id: data.user.id,
-    email: data.user.email ?? "",
+    ...session,
     name: profile?.name ?? "",
     isAdmin: profile?.is_admin ?? false,
   };

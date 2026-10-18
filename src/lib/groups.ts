@@ -9,20 +9,17 @@ import type { Group, Member } from "./types";
 
 /** Carrega o grupo e os jogadores; 404 para quem não é membro (a RLS esconde o grupo). */
 export const getGroupContext = cache(async (groupId: string) => {
-  const user = await requireUser(`/g/${groupId}`);
   const supabase = await createClient();
-  const [{ data: group }, { data: rows }] = await Promise.all([
+  // Tudo em paralelo: perfil, grupo, jogadores e níveis (a RLS só devolve níveis ao organizador).
+  const [user, { data: group }, { data: rows }, { data: skills }] = await Promise.all([
+    requireUser(`/g/${groupId}`),
     supabase.from("groups").select("*").eq("id", groupId).maybeSingle<Group>(),
     supabase.from("members").select("*").eq("group_id", groupId).order("name").returns<Omit<Member, "skill">[]>(),
+    supabase.from("member_skills").select("member_id, skill").eq("group_id", groupId),
   ]);
   if (!group) notFound();
   const me = (rows ?? []).find((m) => m.user_id === user.id) ?? null;
   if (!me && !user.isAdmin) notFound();
-
-  // A RLS só devolve os níveis para o organizador; os outros veem o padrão.
-  const { data: skills } = me?.is_organizer
-    ? await supabase.from("member_skills").select("member_id, skill").eq("group_id", groupId)
-    : { data: [] as { member_id: string; skill: number }[] };
   const skillOf = new Map((skills ?? []).map((s) => [s.member_id, s.skill]));
   const members: Member[] = (rows ?? []).map((m) => ({ ...m, skill: skillOf.get(m.id) ?? 3 }));
   const subscription = subscriptionState(group.paid_until, todayInBrazil());

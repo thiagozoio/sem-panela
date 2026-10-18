@@ -2,10 +2,14 @@
 
 import { refresh } from "next/cache";
 import { getGroupContext } from "@/lib/groups";
+import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
 import { drawTeams } from "@/lib/draw";
 import { parseMoney } from "@/lib/format";
 import type { Attendance, Game, MemberKind, Position } from "@/lib/types";
+
+// As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
+// são garantidas pela RLS do banco; as ações só carregam o grupo inteiro quando precisam dos dados.
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) ?? "").trim();
@@ -25,7 +29,9 @@ export async function setAttendance(fd: FormData) {
   const gameId = str(fd, "game_id");
   const memberId = str(fd, "member_id");
   const going = str(fd, "going") === "1";
-  const { supabase } = await getGroupContext(groupId);
+  if (!groupId) return;
+  // Sem carregar o grupo inteiro: a RLS garante que só o próprio jogador ou o organizador mudam.
+  const supabase = await createClient();
 
   const { data: current } = await supabase
     .from("attendances")
@@ -48,8 +54,7 @@ export async function setAttendance(fd: FormData) {
 }
 
 export async function clearAttendance(fd: FormData) {
-  const groupId = str(fd, "group_id");
-  const { supabase } = await getGroupContext(groupId);
+  const supabase = await createClient();
   await supabase.from("attendances").delete().eq("game_id", str(fd, "game_id")).eq("member_id", str(fd, "member_id"));
   refresh();
 }
@@ -86,8 +91,7 @@ export async function drawTeamsAction(fd: FormData) {
 }
 
 export async function clearTeams(fd: FormData) {
-  const { supabase, isOrganizer } = await getGroupContext(str(fd, "group_id"));
-  if (!isOrganizer) return;
+  const supabase = await createClient();
   await supabase.from("games").update({ teams: null }).eq("id", str(fd, "game_id"));
   refresh();
 }
@@ -102,7 +106,7 @@ function memberFields(fd: FormData) {
   return { name: str(fd, "name").slice(0, 60), position, kind };
 }
 
-type Client = Awaited<ReturnType<typeof getGroupContext>>["supabase"];
+type Client = Awaited<ReturnType<typeof createClient>>;
 
 async function saveSkill(supabase: Client, groupId: string, memberId: string, skill: number) {
   const { data } = await supabase.from("member_skills").select("member_id").eq("member_id", memberId).maybeSingle();
@@ -112,9 +116,9 @@ async function saveSkill(supabase: Client, groupId: string, memberId: string, sk
 
 export async function addMember(fd: FormData) {
   const groupId = str(fd, "group_id");
-  const { supabase, isOrganizer } = await getGroupContext(groupId);
+  const supabase = await createClient();
   const fields = memberFields(fd);
-  if (!isOrganizer || !fields.name) return;
+  if (!fields.name) return;
   const { data } = await supabase.from("members").insert({ group_id: groupId, ...fields }).select("id").single();
   if (data) await saveSkill(supabase, groupId, data.id, clampInt(str(fd, "skill"), 1, 5, 3));
   refresh();
@@ -123,9 +127,9 @@ export async function addMember(fd: FormData) {
 export async function updateMember(fd: FormData) {
   const groupId = str(fd, "group_id");
   const memberId = str(fd, "member_id");
-  const { supabase, isOrganizer } = await getGroupContext(groupId);
+  const supabase = await createClient();
   const fields = memberFields(fd);
-  if (!isOrganizer || !fields.name) return;
+  if (!fields.name) return;
   await supabase.from("members").update(fields).eq("id", memberId).eq("group_id", groupId);
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
   refresh();
@@ -133,8 +137,7 @@ export async function updateMember(fd: FormData) {
 
 export async function setMemberActive(fd: FormData) {
   const groupId = str(fd, "group_id");
-  const { supabase, isOrganizer } = await getGroupContext(groupId);
-  if (!isOrganizer) return;
+  const supabase = await createClient();
   await supabase
     .from("members")
     .update({ active: str(fd, "active") === "1" })
@@ -150,8 +153,7 @@ export async function setMemberActive(fd: FormData) {
 
 export async function togglePayment(fd: FormData) {
   const groupId = str(fd, "group_id");
-  const { supabase, isOrganizer } = await getGroupContext(groupId);
-  if (!isOrganizer) return;
+  const supabase = await createClient();
 
   const paymentId = str(fd, "payment_id");
   if (paymentId) {

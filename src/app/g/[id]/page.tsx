@@ -8,18 +8,24 @@ import { formatGameDate } from "@/lib/format";
 import { listMessage, teamsMessage } from "@/lib/messages";
 import type { Attendance, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
+import { createClient } from "@/lib/supabase/server";
 import { clearAttendance, clearTeams, drawTeamsAction, setAttendance } from "./actions";
 
 export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const { id } = await params;
-  const { supabase, group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
-
-  const { data: gameId } = await supabase.rpc("ensure_next_game", { p_group_id: id });
-  const [{ data: game }, { data: attendances }] = await Promise.all([
-    supabase.from("games").select("*").eq("id", gameId).single<Game>(),
-    supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>(),
+  const supabase = await createClient();
+  // O próximo jogo é garantido em paralelo com o carregamento do grupo.
+  const [{ group, members, me, isOrganizer, readOnly }, { data: gameId }] = await Promise.all([
+    getGroupContext(id),
+    supabase.rpc("ensure_next_game", { p_group_id: id }),
   ]);
-  if (!game) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
+  const { data: gameRow } = await supabase
+    .from("games")
+    .select("*, attendances(*)")
+    .eq("id", gameId)
+    .single<Game & { attendances: Attendance[] }>();
+  if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
+  const { attendances, ...game } = gameRow;
 
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
