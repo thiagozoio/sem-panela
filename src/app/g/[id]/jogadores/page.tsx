@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import type { Member } from "@/lib/types";
 import { addMember, setMemberActive, updateMember } from "../actions";
+import { OrganizerButton } from "./organizer-button";
 
 export const metadata: Metadata = { title: "Jogadores" };
 
@@ -50,7 +51,7 @@ function MemberFields({ member }: { member?: Member }) {
 
 export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogadores">) {
   const { id } = await params;
-  const { group, members, isOrganizer, readOnly } = await getGroupContext(id);
+  const { group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
   const active = members.filter((m) => m.active);
   const inactive = members.filter((m) => !m.active);
   const canEdit = isOrganizer && !readOnly;
@@ -84,6 +85,13 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
                       )}
                     </div>
                   </form>
+                  <div className="mt-2 rounded-xl bg-neutral-50 p-3">
+                    {m.user_id ? (
+                      <OrganizerButton memberId={m.id} isOrganizer={m.is_organizer} isMe={m.id === me?.id} />
+                    ) : (
+                      <p className="text-xs text-neutral-500">Para virar organizador, a pessoa precisa entrar pelo link de convite.</p>
+                    )}
+                  </div>
                 </details>
               ) : (
                 <PlayerSummary member={m} showSkill={false} />
@@ -91,6 +99,12 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
             </li>
           ))}
         </ul>
+        {canEdit && (
+          <p className="text-xs text-neutral-500">
+            Organizadores podem mexer na lista, nos times e no financeiro. Pode ter mais de um. Para passar a pelada para outra
+            pessoa, torne ela organizadora e depois deixe de ser.
+          </p>
+        )}
       </Card>
 
       {canEdit && (

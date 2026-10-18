@@ -58,5 +58,24 @@ export type Payment = {
   month: string | null;
   game_id: string | null;
   amount_cents: number;
+  note: string;
   paid_at: string;
+};
+
+export type FixedTeam = {
+  id: string;
+  group_id: string;
+  month: string;
+  name: string;
+  sort: number;
+  member_ids: string[];
+};
+
+export type Expense = {
+  id: string;
+  group_id: string;
+  month: string;
+  description: string;
+  amount_cents: number;
+  created_at: string;
 };

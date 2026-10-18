@@ -1,18 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, Input } from "@/components/ui";
+import { MonthNav } from "@/components/month-nav";
+import { SubmitButton } from "@/components/submit";
 import { ShareButtons } from "@/components/share";
 import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
-import { addMonths, formatGameDate, formatMoney, monthLabel, monthStart, todayInBrazil } from "@/lib/format";
+import { addMonths, formatGameDate, formatMoney, monthLabel, monthParam } from "@/lib/format";
 import { debtorsMessage } from "@/lib/messages";
-import type { Attendance, Game, Member, Payment } from "@/lib/types";
-import { togglePayment } from "../actions";
+import type { Attendance, Expense, Game, Member, Payment } from "@/lib/types";
+import { addExpense, copyExpenses, deleteExpense, togglePayment } from "../actions";
 
 export const metadata: Metadata = { title: "Financeiro" };
 
-type Row = { member: Member; amountCents: number; payment?: Payment; kind: "mensal" | "avulso"; game?: Game };
+type Row = {
+  member: Member;
+  amountCents: number;
+  payment?: Payment;
+  kind: "mensal" | "avulso";
+  game?: Game;
+};
 
 export default async function FinancePage({ params, searchParams }: PageProps<"/g/[id]/financeiro">) {
   const { id } = await params;
@@ -20,7 +28,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
   const { supabase, group, members, isOrganizer, readOnly } = await getGroupContext(id);
   if (!isOrganizer) notFound();
 
-  const month = typeof mes === "string" && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart(todayInBrazil());
+  const month = monthParam(mes);
   const nextMonth = addMonths(month, 1);
   // Brasil sem horário de verão desde 2019: -03:00 fixo.
   const from = `${month}T00:00:00-03:00`;
@@ -36,12 +44,22 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
     .returns<Game[]>();
   const gameIds = (games ?? []).map((g) => g.id);
 
-  const [{ data: attendances }, { data: payments }] = await Promise.all([
+  const [{ data: attendances }, { data: payments }, { data: expenseRows }] = await Promise.all([
     gameIds.length
       ? supabase.from("attendances").select("*").in("game_id", gameIds).returns<Attendance[]>()
       : Promise.resolve({ data: [] as Attendance[] }),
     supabase.from("payments").select("*").eq("group_id", group.id).returns<Payment[]>(),
+    supabase
+      .from("expenses")
+      .select("*")
+      .eq("group_id", group.id)
+      .in("month", [month, addMonths(month, -1)])
+      .order("created_at")
+      .returns<Expense[]>(),
   ]);
+  const expenses = (expenseRows ?? []).filter((e) => e.month === month);
+  const hasPreviousExpenses = (expenseRows ?? []).some((e) => e.month !== month);
+  const spent = expenses.reduce((n, e) => n + e.amount_cents, 0);
 
   const monthly: Row[] = members
     .filter((m) => m.active && m.kind === "mensalista")
@@ -84,12 +102,8 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
   }));
 
   const PayRow = ({ row }: { row: Row }) => (
-    <li className="flex items-center justify-between gap-2 py-2 text-sm">
-      <span>
-        {row.member.name}
-        {!row.member.active && <span className="text-neutral-400"> (fora do grupo)</span>}
-      </span>
-      <form action={togglePayment} className="flex items-center gap-2">
+    <li className="space-y-1.5 py-2 text-sm">
+      <form action={togglePayment} className="space-y-1.5">
         <input type="hidden" name="group_id" value={group.id} />
         <input type="hidden" name="member_id" value={row.member.id} />
         <input type="hidden" name="kind" value={row.kind} />
@@ -97,29 +111,63 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         <input type="hidden" name="game_id" value={row.game?.id ?? ""} />
         <input type="hidden" name="amount_cents" value={row.amountCents} />
         <input type="hidden" name="payment_id" value={row.payment?.id ?? ""} />
-        <span className="text-neutral-500">{formatMoney(row.payment?.amount_cents ?? row.amountCents)}</span>
-        <Button variant={row.payment ? "primary" : "secondary"} className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly}>
-          {row.payment ? "Pago ✓" : "Marcar pago"}
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <span>
+            {row.member.name}
+            {!row.member.active && <span className="text-neutral-400"> (fora do grupo)</span>}
+          </span>
+          {row.payment ? (
+            <span className="flex items-center gap-2">
+              <span className="text-right text-neutral-500">
+                {formatMoney(row.payment.amount_cents)}
+                {row.payment.note && <span className="block text-xs">{row.payment.note}</span>}
+              </span>
+              <Button className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly} title="Clique para desfazer">
+                Pago ✓
+              </Button>
+            </span>
+          ) : (
+            <Button variant="secondary" className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly}>
+              Marcar pago
+            </Button>
+          )}
+        </div>
+        {!row.payment && !readOnly && (
+          <details className="group">
+            <summary className="w-fit cursor-pointer list-none text-xs text-pitch-700">Outro valor (multa, desconto)</summary>
+            <div className="mt-1.5 flex gap-2">
+              <Input
+                name="amount"
+                inputMode="decimal"
+                placeholder={formatMoney(row.amountCents)}
+                aria-label={`Valor pago por ${row.member.name}`}
+                className="w-28 px-2 py-1.5 text-sm"
+              />
+              <Input
+                name="note"
+                maxLength={60}
+                placeholder="Obs.: multa por atraso"
+                aria-label="Observação"
+                className="px-2 py-1.5 text-sm"
+              />
+            </div>
+          </details>
+        )}
       </form>
     </li>
   );
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Link className="rounded-xl px-3 py-2 text-pitch-700 hover:bg-pitch-50" href={`?mes=${addMonths(month, -1).slice(0, 7)}`}>
-          ‹
-        </Link>
-        <h2 className="font-semibold">{name}</h2>
-        <Link className="rounded-xl px-3 py-2 text-pitch-700 hover:bg-pitch-50" href={`?mes=${nextMonth.slice(0, 7)}`}>
-          ›
-        </Link>
-      </div>
+      <MonthNav month={month} />
 
       {(group.monthly_fee_cents === 0 || group.single_fee_cents === 0) && (
         <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
-          Defina o valor da mensalidade e do avulso em <Link className="font-semibold underline" href={`/g/${group.id}/config`}>Ajustes</Link>.
+          Defina o valor da mensalidade e do avulso em{" "}
+          <Link className="font-semibold underline" href={`/g/${group.id}/config`}>
+            Ajustes
+          </Link>
+          .
         </p>
       )}
 
@@ -127,6 +175,16 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         <Card>
           <p className="text-xs text-neutral-500">Recebido</p>
           <p className="text-lg font-bold text-pitch-700">{formatMoney(received)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-neutral-500">Gastos</p>
+          <p className="text-lg font-bold">{formatMoney(spent)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-neutral-500">Saldo do mês</p>
+          <p className={`text-lg font-bold ${received - spent < 0 ? "text-red-700" : "text-pitch-700"}`}>
+            {formatMoney(received - spent)}
+          </p>
         </Card>
         <Card>
           <p className="text-xs text-neutral-500">Em aberto</p>
@@ -145,7 +203,9 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       <Card>
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Mensalistas</h3>
-          <Badge>{monthly.filter((r) => r.payment).length}/{monthly.length} pagos</Badge>
+          <Badge>
+            {monthly.filter((r) => r.payment).length}/{monthly.length} pagos
+          </Badge>
         </div>
         {monthly.length === 0 ? (
           <p className="pt-2 text-sm text-neutral-500">Nenhum mensalista. Marque em Jogadores.</p>
@@ -175,6 +235,63 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
               </ul>
             </div>
           ))}
+      </Card>
+
+      <Card className="space-y-2">
+        <h3 className="font-semibold">Gastos do mês</h3>
+        {expenses.length === 0 ? (
+          <p className="text-sm text-neutral-500">Nenhum gasto lançado. Coloque aqui quadra, bola, juiz, colete…</p>
+        ) : (
+          <ul className="divide-y divide-neutral-100 text-sm">
+            {expenses.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-2 py-2">
+                <span>{e.description}</span>
+                <form action={deleteExpense} className="flex items-center gap-2">
+                  <input type="hidden" name="group_id" value={group.id} />
+                  <input type="hidden" name="expense_id" value={e.id} />
+                  <span className="text-neutral-500">{formatMoney(e.amount_cents)}</span>
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      className="px-2 py-1 text-red-700"
+                      title="Apagar gasto"
+                      aria-label={`Apagar ${e.description}`}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!readOnly && (
+          <>
+            <form action={addExpense} className="grid grid-cols-[1fr_auto] gap-2 border-t border-neutral-100 pt-3">
+              <input type="hidden" name="group_id" value={group.id} />
+              <input type="hidden" name="month" value={month} />
+              <Input
+                name="description"
+                maxLength={80}
+                placeholder="Ex.: Aluguel da quadra"
+                required
+                aria-label="Descrição do gasto"
+                className="col-span-2"
+              />
+              <Input name="amount" inputMode="decimal" placeholder="Valor (R$)" required aria-label="Valor do gasto" />
+              <SubmitButton pendingText="…">Lançar gasto</SubmitButton>
+            </form>
+            {expenses.length === 0 && hasPreviousExpenses && (
+              <form action={copyExpenses}>
+                <input type="hidden" name="group_id" value={group.id} />
+                <input type="hidden" name="month" value={month} />
+                <SubmitButton variant="secondary" className="w-full" pendingText="Copiando…">
+                  Repetir os gastos de {monthLabel(addMonths(month, -1))}
+                </SubmitButton>
+              </form>
+            )}
+          </>
+        )}
       </Card>
     </div>
   );

@@ -18,9 +18,9 @@ export default async function Home() {
     <main className="flex flex-1 flex-col">
       <section className="bg-pitch-700 px-4 pb-12 pt-14 text-white">
         <div className="mx-auto max-w-xl space-y-5">
-          <p className="text-sm font-semibold uppercase tracking-widest text-pitch-100">Sem Panela ⚽</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-white/80">Sem Panela ⚽</p>
           <h1 className="text-3xl font-extrabold leading-tight">A pelada organizada e paga em dia.</h1>
-          <p className="text-pitch-100">
+          <p className="text-white/80">
             Lista de presença, sorteio de times equilibrados e controle de quem pagou, tudo num link para o grupo do WhatsApp.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -31,7 +31,7 @@ export default async function Home() {
       </section>
       <section className="mx-auto grid w-full max-w-xl gap-3 px-4 py-8">
         {features.map(([icon, title, text]) => (
-          <div key={title} className="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-black/5">
+          <div key={title} className="flex gap-3 rounded-2xl bg-surface p-4 ring-1 ring-black/5">
             <span className="text-2xl">{icon}</span>
             <div>
               <h2 className="font-semibold">{title}</h2>

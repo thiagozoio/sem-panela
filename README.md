@@ -43,7 +43,7 @@ npm run lint
 ## Configurando o Supabase (uma vez)
 
 1. Crie um projeto na região **South America (São Paulo)**.
-2. No **SQL Editor**, rode `supabase/migrations/20261014000000_init.sql` (ou `supabase db push` com a CLI).
+2. No **SQL Editor**, rode os arquivos de `supabase/migrations/` em ordem de data (ou `supabase db push` com a CLI).
 3. **Authentication > URL Configuration**: `Site URL` = URL do app (ex.: `https://sempanela.vercel.app`) e adicione `https://sempanela.vercel.app/**` e `http://localhost:3000/**` em *Redirect URLs*.
 4. **Authentication > Email Templates**, nos modelos *Magic Link* e *Confirm signup*, troque o corpo por algo assim (o link funciona até aberto em outro navegador, e o código serve para quem está no app instalado):
 

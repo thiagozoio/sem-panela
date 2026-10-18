@@ -4,12 +4,12 @@ import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
-import { formatGameDate } from "@/lib/format";
+import { formatGameDate, monthOf } from "@/lib/format";
 import { listMessage, teamsMessage } from "@/lib/messages";
 import type { Attendance, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import { clearAttendance, clearTeams, drawTeamsAction, setAttendance } from "./actions";
+import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, setAttendance } from "./actions";
 
 export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const { id } = await params;
@@ -26,6 +26,14 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
     .single<Game & { attendances: Attendance[] }>();
   if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
   const { attendances, ...game } = gameRow;
+  const { count: fixedTeams } =
+    isOrganizer && !readOnly
+      ? await supabase
+          .from("fixed_teams")
+          .select("id", { count: "exact", head: true })
+          .eq("group_id", group.id)
+          .eq("month", monthOf(game.starts_at))
+      : { count: 0 };
 
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
@@ -187,6 +195,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
             <SubmitButton pendingText="Sorteando…" disabled={list.confirmed.length < 2}>
               {game.teams ? "Sortear de novo" : "Sortear times"}
             </SubmitButton>
+            {!!fixedTeams && (
+              <Button variant="secondary" formAction={applyFixedTeams} disabled={list.confirmed.length < 2}>
+                Usar times fixos
+              </Button>
+            )}
             {game.teams && (
               <Button variant="ghost" formAction={clearTeams}>
                 Apagar sorteio

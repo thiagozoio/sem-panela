@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
+import { ThemeToggle } from "./theme-toggle";
 
 export function AppShell({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
   return (
@@ -11,6 +12,7 @@ export function AppShell({ children, admin = false }: { children: ReactNode; adm
             Sem Panela ⚽
           </Link>
           <nav className="flex items-center gap-3 text-sm">
+            <ThemeToggle />
             {admin && <Link href="/admin">Admin</Link>}
             <Link href="/perfil">Perfil</Link>
             <form action={signOut}>

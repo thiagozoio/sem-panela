@@ -4,9 +4,10 @@ import { refresh } from "next/cache";
 import { getGroupContext } from "@/lib/groups";
 import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
-import { drawTeams } from "@/lib/draw";
-import { parseMoney } from "@/lib/format";
-import type { Attendance, Game, MemberKind, Position } from "@/lib/types";
+import { drawTeams, type DrawPlayer } from "@/lib/draw";
+import { teamsFromFixed } from "@/lib/fixed-teams";
+import { addMonths, monthOf, parseMoney } from "@/lib/format";
+import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
 // são garantidas pela RLS do banco; as ações só carregam o grupo inteiro quando precisam dos dados.
@@ -14,6 +15,8 @@ import type { Attendance, Game, MemberKind, Position } from "@/lib/types";
 function str(fd: FormData, key: string) {
   return String(fd.get(key) ?? "").trim();
 }
+
+const isMonth = (v: string) => /^\d{4}-\d{2}-01$/.test(v);
 
 function clampInt(value: string, min: number, max: number, fallback: number) {
   const n = Number.parseInt(value, 10);
@@ -63,30 +66,50 @@ export async function clearAttendance(fd: FormData) {
 // Sorteio
 // ---------------------------------------------------------------------------
 
-export async function drawTeamsAction(fd: FormData) {
-  const groupId = str(fd, "group_id");
-  const gameId = str(fd, "game_id");
-  const { supabase, group, members, isOrganizer } = await getGroupContext(groupId);
-  if (!isOrganizer) return;
+const toDrawPlayer = (member: Member): DrawPlayer => ({
+  member_id: member.id,
+  name: member.name,
+  position: member.position,
+  skill: member.skill,
+});
 
+async function confirmedForGame(groupId: string, gameId: string) {
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.isOrganizer) return null;
+  const { supabase, group, members } = ctx;
   const [{ data: game }, { data: attendances }] = await Promise.all([
     supabase.from("games").select("*").eq("id", gameId).single<Game>(),
     supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>(),
   ]);
-  if (!game) return;
-
+  if (!game) return null;
   const { confirmed } = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
-  const numTeams = clampInt(str(fd, "teams"), 2, 8, 2);
-  const teams = drawTeams(
-    confirmed.map(({ member }) => ({
-      member_id: member.id,
-      name: member.name,
-      position: member.position,
-      skill: member.skill,
-    })),
-    numTeams,
-  );
-  await supabase.from("games").update({ teams }).eq("id", gameId);
+  return { supabase, game, players: confirmed.map(({ member }) => toDrawPlayer(member)) };
+}
+
+export async function drawTeamsAction(fd: FormData) {
+  const gameId = str(fd, "game_id");
+  const data = await confirmedForGame(str(fd, "group_id"), gameId);
+  if (!data) return;
+  const teams = drawTeams(data.players, clampInt(str(fd, "teams"), 2, 8, 2));
+  await data.supabase.from("games").update({ teams }).eq("id", gameId);
+  refresh();
+}
+
+/** Monta os times do jogo com os times fixos do mês. */
+export async function applyFixedTeams(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const data = await confirmedForGame(groupId, gameId);
+  if (!data) return;
+  const { data: fixed } = await data.supabase
+    .from("fixed_teams")
+    .select("*")
+    .eq("group_id", groupId)
+    .eq("month", monthOf(data.game.starts_at))
+    .order("sort")
+    .returns<FixedTeam[]>();
+  if (!fixed?.length) return;
+  await data.supabase.from("games").update({ teams: teamsFromFixed(fixed, data.players) }).eq("id", gameId);
   refresh();
 }
 
@@ -147,6 +170,118 @@ export async function setMemberActive(fd: FormData) {
   refresh();
 }
 
+export type OrganizerState = { error?: string };
+
+export async function setOrganizer(_prev: OrganizerState, fd: FormData): Promise<OrganizerState> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_organizer", {
+    p_member_id: str(fd, "member_id"),
+    p_value: str(fd, "value") === "1",
+  });
+  if (error) {
+    if (error.message.includes("pelo menos um")) return { error: "O grupo precisa de pelo menos um organizador. Promova outra pessoa antes." };
+    if (error.message.includes("convite")) return { error: "A pessoa precisa entrar pelo link de convite antes de virar organizador." };
+    return { error: "Não deu para mudar. Se a assinatura venceu, o grupo está só leitura." };
+  }
+  refresh();
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// Times fixos do mês
+// ---------------------------------------------------------------------------
+
+export async function createFixedTeams(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const month = str(fd, "month");
+  if (!isMonth(month)) return;
+  const { supabase, members, isOrganizer } = await getGroupContext(groupId);
+  if (!isOrganizer) return;
+  const count = clampInt(str(fd, "teams"), 2, 8, 2);
+  const mensalistas = members.filter((m) => m.active && m.kind === "mensalista").map(toDrawPlayer);
+  const drawn = str(fd, "fill") === "1" && mensalistas.length >= 2 ? drawTeams(mensalistas, count) : [];
+  await supabase.from("fixed_teams").insert(
+    Array.from({ length: count }, (_, i) => ({
+      group_id: groupId,
+      month,
+      name: `Time ${i + 1}`,
+      sort: i,
+      member_ids: drawn[i]?.players.map((p) => p.member_id) ?? [],
+    })),
+  );
+  refresh();
+}
+
+export async function copyFixedTeams(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const month = str(fd, "month");
+  if (!isMonth(month)) return;
+  const supabase = await createClient();
+  const { data: previous } = await supabase
+    .from("fixed_teams")
+    .select("*")
+    .eq("group_id", groupId)
+    .eq("month", addMonths(month, -1))
+    .order("sort")
+    .returns<FixedTeam[]>();
+  if (!previous?.length) return;
+  await supabase
+    .from("fixed_teams")
+    .insert(previous.map(({ name, sort, member_ids }) => ({ group_id: groupId, month, name, sort, member_ids })));
+  refresh();
+}
+
+export async function addFixedTeam(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const month = str(fd, "month");
+  if (!isMonth(month)) return;
+  const supabase = await createClient();
+  const { data: teams } = await supabase.from("fixed_teams").select("sort").eq("group_id", groupId).eq("month", month);
+  const count = teams?.length ?? 0;
+  if (count >= 8) return;
+  const sort = Math.max(-1, ...(teams ?? []).map((t) => t.sort)) + 1;
+  await supabase.from("fixed_teams").insert({ group_id: groupId, month, name: `Time ${count + 1}`, sort });
+  refresh();
+}
+
+export async function renameFixedTeam(fd: FormData) {
+  const name = str(fd, "name").slice(0, 30);
+  if (!name) return;
+  const supabase = await createClient();
+  await supabase.from("fixed_teams").update({ name }).eq("id", str(fd, "team_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+export async function deleteFixedTeam(fd: FormData) {
+  const supabase = await createClient();
+  await supabase.from("fixed_teams").delete().eq("id", str(fd, "team_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+/** Põe o jogador num time do mês (ou em nenhum, com team_id vazio), tirando dos outros. */
+export async function setPlayerTeam(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const month = str(fd, "month");
+  const memberId = str(fd, "member_id");
+  const teamId = str(fd, "team_id");
+  if (!isMonth(month) || !memberId) return;
+  const supabase = await createClient();
+  const { data: teams } = await supabase
+    .from("fixed_teams")
+    .select("*")
+    .eq("group_id", groupId)
+    .eq("month", month)
+    .returns<FixedTeam[]>();
+  for (const t of teams ?? []) {
+    const has = t.member_ids.includes(memberId);
+    const want = t.id === teamId;
+    if (has === want) continue;
+    const member_ids = want ? [...t.member_ids, memberId] : t.member_ids.filter((id) => id !== memberId);
+    await supabase.from("fixed_teams").update({ member_ids }).eq("id", t.id);
+  }
+  refresh();
+}
+
 // ---------------------------------------------------------------------------
 // Financeiro
 // ---------------------------------------------------------------------------
@@ -160,15 +295,50 @@ export async function togglePayment(fd: FormData) {
     await supabase.from("payments").delete().eq("id", paymentId).eq("group_id", groupId);
   } else {
     const kind = str(fd, "kind") === "avulso" ? "avulso" : "mensal";
+    // O valor vem do campo (pode ter multa ou desconto); vazio usa o valor padrão.
+    const typed = str(fd, "amount");
     await supabase.from("payments").insert({
       group_id: groupId,
       member_id: str(fd, "member_id"),
       kind,
       month: kind === "mensal" ? str(fd, "month") : null,
       game_id: kind === "avulso" ? str(fd, "game_id") : null,
-      amount_cents: Number.parseInt(str(fd, "amount_cents"), 10) || 0,
+      amount_cents: typed ? parseMoney(typed) : Number.parseInt(str(fd, "amount_cents"), 10) || 0,
+      note: str(fd, "note").slice(0, 60),
     });
   }
+  refresh();
+}
+
+export async function addExpense(fd: FormData) {
+  const month = str(fd, "month");
+  const description = str(fd, "description").slice(0, 80);
+  const amount_cents = parseMoney(str(fd, "amount"));
+  if (!isMonth(month) || !description || !amount_cents) return;
+  const supabase = await createClient();
+  await supabase.from("expenses").insert({ group_id: str(fd, "group_id"), month, description, amount_cents });
+  refresh();
+}
+
+export async function deleteExpense(fd: FormData) {
+  const supabase = await createClient();
+  await supabase.from("expenses").delete().eq("id", str(fd, "expense_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+export async function copyExpenses(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const month = str(fd, "month");
+  if (!isMonth(month)) return;
+  const supabase = await createClient();
+  const { data: previous } = await supabase
+    .from("expenses")
+    .select("description, amount_cents")
+    .eq("group_id", groupId)
+    .eq("month", addMonths(month, -1))
+    .order("created_at");
+  if (!previous?.length) return;
+  await supabase.from("expenses").insert(previous.map((e) => ({ ...e, group_id: groupId, month })));
   refresh();
 }
 

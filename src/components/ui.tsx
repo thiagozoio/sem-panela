@@ -5,9 +5,9 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:pointer-events-none";
 
 export const buttonStyles = {
-  primary: `${base} bg-pitch-700 text-white hover:bg-pitch-600 active:bg-pitch-900`,
-  secondary: `${base} bg-white text-pitch-900 ring-1 ring-black/10 hover:bg-pitch-50`,
-  danger: `${base} bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50`,
+  primary: `${base} bg-pitch-700 text-white hover:bg-pitch-600 active:brightness-90`,
+  secondary: `${base} bg-surface text-pitch-900 ring-1 ring-black/10 hover:bg-pitch-50`,
+  danger: `${base} bg-surface text-red-700 ring-1 ring-red-200 hover:bg-red-50`,
   ghost: `${base} text-pitch-700 hover:bg-pitch-50`,
 };
 
@@ -30,7 +30,7 @@ export function LinkButton({
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 ${className}`}>{children}</section>;
+  return <section className={`rounded-2xl bg-surface p-4 shadow-sm ring-1 ring-black/5 ${className}`}>{children}</section>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -44,7 +44,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export const inputStyles =
-  "w-full rounded-xl border border-neutral-300 bg-white px-3 py-2.5 text-base outline-none focus:border-pitch-600 focus:ring-2 focus:ring-pitch-100 disabled:bg-neutral-100";
+  "w-full rounded-xl border border-neutral-300 bg-surface px-3 py-2.5 text-base outline-none focus:border-pitch-600 focus:ring-2 focus:ring-pitch-100 disabled:bg-neutral-100";
 
 export function Input(props: ComponentProps<"input">) {
   return <input {...props} className={`${inputStyles} ${props.className ?? ""}`} />;

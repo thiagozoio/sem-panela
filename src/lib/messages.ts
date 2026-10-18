@@ -22,12 +22,12 @@ export function listMessage(
 }
 
 export function teamsMessage(groupName: string, startsAt: string, teams: Team[]): string {
-  const lines = [`⚽ *${groupName}*: times sorteados`, formatGameDate(startsAt)];
+  const lines = [`⚽ *${groupName}*: times`, formatGameDate(startsAt)];
   for (const t of teams) {
     lines.push("", `*${t.name}*`);
     t.players.forEach((p) => lines.push(`${p.position === "goleiro" ? "🧤" : "•"} ${p.name}`));
   }
-  lines.push("", "Sorteado no Sem Panela, sem panelinha 😉");
+  lines.push("", "Times do Sem Panela, sem panelinha 😉");
   return lines.join("\n");
 }
 

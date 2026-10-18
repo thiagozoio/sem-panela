@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
+/* Modo escuro: classe "dark" no <html>, posta pelo script do layout (escolha salva ou a do celular). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  --color-surface: #ffffff;
   --color-pitch-50: #effaf3;
   --color-pitch-100: #d8f3e1;
   --color-pitch-500: #22a35a;
@@ -12,9 +16,57 @@
 
 :root {
   color-scheme: light;
+  --app-bg: #f4f6f5;
+  --app-fg: #17211b;
+}
+
+/*
+ * No escuro, as mesmas classes do app trocam de cor: fundos claros viram escuros
+ * e textos escuros viram claros. Assim nenhuma tela precisa de classes "dark:".
+ */
+:root.dark {
+  color-scheme: dark;
+  --app-bg: #0f1412;
+  --app-fg: #e4ebe7;
+  --color-surface: #18201c;
+  --color-black: #000000;
+
+  --color-neutral-50: #1e2622;
+  --color-neutral-100: #27302c;
+  --color-neutral-200: #323c37;
+  --color-neutral-300: #3f4a44;
+  --color-neutral-400: #6d7a73;
+  --color-neutral-500: #8d9a93;
+  --color-neutral-600: #a8b3ad;
+  --color-neutral-700: #c3ccc7;
+
+  --color-pitch-50: #13291d;
+  --color-pitch-100: #1a3b28;
+  --color-pitch-500: #34b46b;
+  --color-pitch-600: #2aa05d;
+  --color-pitch-700: #21914f;
+  --color-pitch-900: #cdeedb;
+
+  --color-amber-50: #2a2112;
+  --color-amber-100: #3b2d13;
+  --color-amber-200: #5a4418;
+  --color-amber-600: #f2b84f;
+  --color-amber-900: #f5dca8;
+
+  --color-red-50: #2e1718;
+  --color-red-100: #3f1d1e;
+  --color-red-200: #5e2a2a;
+  --color-red-700: #f1928c;
+  --color-red-800: #f3a7a2;
+  --color-red-900: #f7c5c1;
+}
+
+:root.dark .ring-black\/5,
+:root.dark .ring-black\/10 {
+  --tw-ring-color: rgb(255 255 255 / 0.08);
 }
 
 body {
-  background: #f4f6f5;
-  color: #17211b;
+  background: var(--app-bg);
+  color: var(--app-fg);
 }

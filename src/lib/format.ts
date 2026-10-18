@@ -45,6 +45,16 @@ export function monthStart(day: string): string {
   return `${day.slice(0, 7)}-01`;
 }
 
+/** Mês (YYYY-MM-01) de um horário ISO, no fuso de São Paulo. */
+export function monthOf(iso: string): string {
+  return monthStart(todayInBrazil(new Date(iso)));
+}
+
+/** Lê ?mes=AAAA-MM; sem ele (ou inválido), o mês atual. */
+export function monthParam(mes: unknown): string {
+  return typeof mes === "string" && /^\d{4}-\d{2}$/.test(mes) ? `${mes}-01` : monthStart(todayInBrazil());
+}
+
 /** Soma meses a uma data YYYY-MM-DD, segurando o fim do mês (31/01 + 1 = 28/02). */
 export function addMonths(day: string, months: number): string {
   const [y, m, d] = day.slice(0, 10).split("-").map(Number);
