@@ -1,4 +1,5 @@
 import type { Position, Sport } from "./sports";
+import type { RankingMode } from "./standings";
 
 export type { Position, Sport };
 export type MemberKind = "mensalista" | "avulso";
@@ -21,6 +22,8 @@ export type Group = {
   cash_start_cents: number;
   /** Modalidade; define as posições. Antes da migração 20261019120000 vem vazio. */
   sport?: Sport;
+  /** Classificação ligada pelo organizador. Antes da migração 20261019180000 vem vazio. */
+  ranking?: RankingMode;
   created_at: string;
 };
 
