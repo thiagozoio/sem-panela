@@ -120,6 +120,41 @@ export async function clearTeams(fd: FormData) {
 }
 
 // ---------------------------------------------------------------------------
+// Depois do jogo: placar, gols e notas
+// ---------------------------------------------------------------------------
+
+/** Placar por time e gols por jogador; campos "score_<i>" e "goals_<member_id>". */
+export async function saveResult(fd: FormData) {
+  const gameId = str(fd, "game_id");
+  const supabase = await createClient();
+  const scores: number[] = [];
+  for (let i = 0; fd.has(`score_${i}`); i++) scores.push(clampInt(str(fd, `score_${i}`), 0, 99, 0));
+  const goals = [...fd.keys()]
+    .filter((k) => k.startsWith("goals_"))
+    .map((k) => ({ game_id: gameId, member_id: k.slice(6), goals: clampInt(str(fd, k), 0, 50, 0) }));
+
+  const { error } = await supabase.from("games").update({ scores: scores.length ? scores : null }).eq("id", gameId);
+  if (error) return;
+  await supabase.from("game_goals").delete().eq("game_id", gameId);
+  const scored = goals.filter((g) => g.goals > 0);
+  if (scored.length) await supabase.from("game_goals").insert(scored);
+  refresh();
+}
+
+/** Notas que o jogador logado deu; campos "rating_<member_id>" (vazio = sem nota). */
+export async function saveRatings(fd: FormData) {
+  const gameId = str(fd, "game_id");
+  const raterId = str(fd, "rater_id");
+  const supabase = await createClient();
+  const ratings = [...fd.keys()]
+    .filter((k) => k.startsWith("rating_") && str(fd, k))
+    .map((k) => ({ game_id: gameId, rater_id: raterId, rated_id: k.slice(7), rating: clampInt(str(fd, k), 1, 10, 5) }));
+  await supabase.from("game_ratings").delete().eq("game_id", gameId).eq("rater_id", raterId);
+  if (ratings.length) await supabase.from("game_ratings").insert(ratings);
+  refresh();
+}
+
+// ---------------------------------------------------------------------------
 // Jogadores
 // ---------------------------------------------------------------------------
 
@@ -297,16 +332,28 @@ export async function togglePayment(fd: FormData) {
     const kind = str(fd, "kind") === "avulso" ? "avulso" : "mensal";
     // O valor vem do campo (pode ter multa ou desconto); vazio usa o valor padrão.
     const typed = str(fd, "amount");
-    await supabase.from("payments").insert({
+    const payment = {
       group_id: groupId,
       member_id: str(fd, "member_id"),
       kind,
       month: kind === "mensal" ? str(fd, "month") : null,
       game_id: kind === "avulso" ? str(fd, "game_id") : null,
       amount_cents: typed ? parseMoney(typed) : Number.parseInt(str(fd, "amount_cents"), 10) || 0,
-      note: str(fd, "note").slice(0, 60),
-    });
+    };
+    const note = str(fd, "note").slice(0, 60);
+    const { error } = await supabase.from("payments").insert({ ...payment, note });
+    // Banco ainda sem a coluna "note" (migração de 18/10 não rodada): registra sem a observação.
+    if (error?.message.includes("note")) await supabase.from("payments").insert(payment);
   }
+  refresh();
+}
+
+/** Saldo do caixa antes de começar a usar o app; aceita negativo ("-50"). */
+export async function setCashStart(fd: FormData) {
+  const typed = str(fd, "cash_start");
+  const cents = parseMoney(typed) * (typed.startsWith("-") ? -1 : 1);
+  const supabase = await createClient();
+  await supabase.from("groups").update({ cash_start_cents: cents }).eq("id", str(fd, "group_id"));
   refresh();
 }
 

@@ -45,6 +45,10 @@ export function monthStart(day: string): string {
   return `${day.slice(0, 7)}-01`;
 }
 
+export function hasStarted(iso: string, now = new Date()): boolean {
+  return new Date(iso).getTime() <= now.getTime();
+}
+
 /** Mês (YYYY-MM-01) de um horário ISO, no fuso de São Paulo. */
 export function monthOf(iso: string): string {
   return monthStart(todayInBrazil(new Date(iso)));

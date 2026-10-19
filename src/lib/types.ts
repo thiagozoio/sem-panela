@@ -16,6 +16,7 @@ export type Group = {
   invite_code: string;
   owner_id: string;
   paid_until: string;
+  cash_start_cents: number;
   created_at: string;
 };
 
@@ -41,7 +42,12 @@ export type Game = {
   group_id: string;
   starts_at: string;
   teams: Team[] | null;
+  /** Gols de cada time, na mesma ordem de `teams`. */
+  scores: number[] | null;
 };
+
+export type GameGoal = { game_id: string; member_id: string; goals: number };
+export type RatingSummary = { member_id: string; average: number; votes: number };
 
 export type Attendance = {
   game_id: string;

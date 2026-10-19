@@ -10,7 +10,7 @@ import { splitList } from "@/lib/attendance";
 import { addMonths, formatGameDate, formatMoney, monthLabel, monthParam } from "@/lib/format";
 import { debtorsMessage } from "@/lib/messages";
 import type { Attendance, Expense, Game, Member, Payment } from "@/lib/types";
-import { addExpense, copyExpenses, deleteExpense, togglePayment } from "../actions";
+import { addExpense, copyExpenses, deleteExpense, setCashStart, togglePayment } from "../actions";
 
 export const metadata: Metadata = { title: "Financeiro" };
 
@@ -49,16 +49,15 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       ? supabase.from("attendances").select("*").in("game_id", gameIds).returns<Attendance[]>()
       : Promise.resolve({ data: [] as Attendance[] }),
     supabase.from("payments").select("*").eq("group_id", group.id).returns<Payment[]>(),
-    supabase
-      .from("expenses")
-      .select("*")
-      .eq("group_id", group.id)
-      .in("month", [month, addMonths(month, -1)])
-      .order("created_at")
-      .returns<Expense[]>(),
+    supabase.from("expenses").select("*").eq("group_id", group.id).order("created_at").returns<Expense[]>(),
   ]);
   const expenses = (expenseRows ?? []).filter((e) => e.month === month);
-  const hasPreviousExpenses = (expenseRows ?? []).some((e) => e.month !== month);
+  const hasPreviousExpenses = (expenseRows ?? []).some((e) => e.month === addMonths(month, -1));
+  // Caixa: saldo inicial + tudo que entrou - tudo que saiu, desde o começo.
+  const cash =
+    (group.cash_start_cents ?? 0) +
+    (payments ?? []).reduce((n, p) => n + p.amount_cents, 0) -
+    (expenseRows ?? []).reduce((n, e) => n + e.amount_cents, 0);
   const spent = expenses.reduce((n, e) => n + e.amount_cents, 0);
 
   const monthly: Row[] = members
@@ -170,6 +169,37 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
           .
         </p>
       )}
+
+      <Card className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-xs text-neutral-500">Caixa da pelada (hoje)</p>
+            <p className={`text-2xl font-extrabold ${cash < 0 ? "text-red-700" : "text-pitch-700"}`}>{formatMoney(cash)}</p>
+          </div>
+          <p className="text-right text-xs text-neutral-500">
+            saldo inicial
+            <br />
+            {formatMoney(group.cash_start_cents)}
+          </p>
+        </div>
+        {!readOnly && (
+          <details>
+            <summary className="w-fit cursor-pointer list-none text-xs text-pitch-700">Mudar saldo inicial</summary>
+            <form action={setCashStart} className="mt-2 flex gap-2">
+              <input type="hidden" name="group_id" value={group.id} />
+              <Input
+                name="cash_start"
+                inputMode="decimal"
+                defaultValue={group.cash_start_cents ? (group.cash_start_cents / 100).toFixed(2).replace(".", ",") : ""}
+                placeholder="Quanto tinha no caixa"
+                aria-label="Saldo inicial do caixa"
+              />
+              <SubmitButton pendingText="…">Salvar</SubmitButton>
+            </form>
+            <p className="mt-1 text-xs text-neutral-500">O dinheiro que já estava no caixa antes de usar o app. Se estava devendo, use o sinal de menos.</p>
+          </details>
+        )}
+      </Card>
 
       <div className="grid grid-cols-2 gap-3">
         <Card>

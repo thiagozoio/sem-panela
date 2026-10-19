@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, Button, Card, Input } from "@/components/ui";
 import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
@@ -26,14 +27,23 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
     .single<Game & { attendances: Attendance[] }>();
   if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
   const { attendances, ...game } = gameRow;
-  const { count: fixedTeams } =
+  const [{ count: fixedTeams }, { data: lastGame }] = await Promise.all([
     isOrganizer && !readOnly
-      ? await supabase
+      ? supabase
           .from("fixed_teams")
           .select("id", { count: "exact", head: true })
           .eq("group_id", group.id)
           .eq("month", monthOf(game.starts_at))
-      : { count: 0 };
+      : Promise.resolve({ count: 0 }),
+    supabase
+      .from("games")
+      .select("id, starts_at, teams, scores")
+      .eq("group_id", group.id)
+      .lte("starts_at", new Date().toISOString())
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<Pick<Game, "id" | "starts_at" | "teams" | "scores">>(),
+  ]);
 
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
@@ -99,6 +109,22 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
           </div>
         )}
       </Card>
+
+      {lastGame && (
+        <Link
+          href={`/g/${group.id}/jogos/${lastGame.id}`}
+          className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-4 text-sm shadow-sm ring-1 ring-black/5"
+        >
+          <span>
+            <span className="block text-xs font-semibold uppercase tracking-wide text-pitch-700">Último jogo</span>
+            {formatGameDate(lastGame.starts_at)}
+            {lastGame.teams && lastGame.scores?.length
+              ? ` · ${lastGame.teams.map((t, i) => `${t.name} ${lastGame.scores?.[i] ?? 0}`).join(" × ")}`
+              : ""}
+          </span>
+          <span className="whitespace-nowrap font-semibold text-pitch-700">Placar e notas ›</span>
+        </Link>
+      )}
 
       <Card className="space-y-3">
         <h2 className="font-semibold">Confirmados</h2>
