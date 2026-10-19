@@ -7,6 +7,7 @@ import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
 import { formatGameDate, monthOf } from "@/lib/format";
 import { listMessage, teamsMessage } from "@/lib/messages";
+import { byPosition, positionInfo, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
     .single<Game & { attendances: Attendance[] }>();
   if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
   const { attendances, ...game } = gameRow;
+  const sport = sportOf(group.sport);
   const [{ count: fixedTeams }, { data: lastGame }] = await Promise.all([
     isOrganizer && !readOnly
       ? supabase
@@ -128,11 +130,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
 
       <Card className="space-y-3">
         <h2 className="font-semibold">Confirmados</h2>
-        <PlayerList entries={list.confirmed} empty="Ninguém confirmou ainda." />
+        <PlayerList entries={list.confirmed} sport={sport} empty="Ninguém confirmou ainda." />
         {list.waitlist.length > 0 && (
           <>
             <h2 className="pt-2 font-semibold">Lista de espera</h2>
-            <PlayerList entries={list.waitlist} />
+            <PlayerList entries={list.waitlist} sport={sport} />
           </>
         )}
         {list.out.length > 0 && (
@@ -140,7 +142,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         )}
         <ShareButtons
           label="Mandar lista no WhatsApp"
-          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, group.max_players, `${origin}/g/${group.id}`)}
+          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, group.max_players, `${origin}/g/${group.id}`, sport)}
         />
       </Card>
 
@@ -185,17 +187,18 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
                 <div key={t.name} className="rounded-xl bg-pitch-50 p-3">
                   <p className="font-semibold text-pitch-900">{t.name}</p>
                   <ul className="mt-1 text-sm">
-                    {t.players.map((p) => (
+                    {[...t.players].sort(byPosition(sport)).map((p) => (
                       <li key={p.member_id}>
-                        {p.position === "goleiro" ? "🧤 " : "• "}
+                        {p.position === "goleiro" && sport !== "volei" ? "🧤 " : "• "}
                         {p.name}
+                        <PositionTag sport={sport} position={p.position} />
                       </li>
                     ))}
                   </ul>
                 </div>
               ))}
             </div>
-            <ShareButtons label="Mandar times no WhatsApp" text={teamsMessage(group.name, game.starts_at, game.teams)} />
+            <ShareButtons label="Mandar times no WhatsApp" text={teamsMessage(group.name, game.starts_at, game.teams, sport)} />
           </>
         ) : (
           <p className="text-sm text-neutral-600">
@@ -238,7 +241,18 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   );
 }
 
-function PlayerList({ entries, empty }: { entries: ListEntry[]; empty?: string }) {
+/** Sigla da posição (ZAG, PIV…); o goleiro já aparece com 🧤. */
+function PositionTag({ sport, position }: { sport: Sport; position: string }) {
+  const info = positionInfo(sport, position);
+  if (!info || info.value === "goleiro") return null;
+  return (
+    <span className="ml-1 text-xs text-neutral-500" title={info.label}>
+      {info.short}
+    </span>
+  );
+}
+
+function PlayerList({ entries, sport, empty }: { entries: ListEntry[]; sport: Sport; empty?: string }) {
   if (entries.length === 0) return <p className="text-sm text-neutral-500">{empty}</p>;
   return (
     <ol className="space-y-1 text-sm">
@@ -246,7 +260,8 @@ function PlayerList({ entries, empty }: { entries: ListEntry[]; empty?: string }
         <li key={e.member.id} className="flex items-center gap-2">
           <span className="w-6 text-right text-neutral-400">{i + 1}.</span>
           <span>{e.member.name}</span>
-          {e.member.position === "goleiro" && <span title="Goleiro">🧤</span>}
+          {positionInfo(sport, e.member.position)?.value === "goleiro" && <span title="Goleiro">🧤</span>}
+          <PositionTag sport={sport} position={e.member.position} />
           {e.member.kind === "mensalista" && <Badge>mensalista</Badge>}
         </li>
       ))}

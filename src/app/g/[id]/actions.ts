@@ -7,6 +7,7 @@ import { splitList } from "@/lib/attendance";
 import { drawTeams, type DrawPlayer } from "@/lib/draw";
 import { teamsFromFixed } from "@/lib/fixed-teams";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
+import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -66,10 +67,10 @@ export async function clearAttendance(fd: FormData) {
 // Sorteio
 // ---------------------------------------------------------------------------
 
-const toDrawPlayer = (member: Member): DrawPlayer => ({
+const toDrawPlayer = (sport: Sport, member: Member): DrawPlayer => ({
   member_id: member.id,
   name: member.name,
-  position: member.position,
+  position: positionOf(sport, member.position),
   skill: member.skill,
 });
 
@@ -83,7 +84,8 @@ async function confirmedForGame(groupId: string, gameId: string) {
   ]);
   if (!game) return null;
   const { confirmed } = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
-  return { supabase, game, players: confirmed.map(({ member }) => toDrawPlayer(member)) };
+  const sport = sportOf(group.sport);
+  return { supabase, game, players: confirmed.map(({ member }) => toDrawPlayer(sport, member)) };
 }
 
 export async function drawTeamsAction(fd: FormData) {
@@ -159,7 +161,8 @@ export async function saveRatings(fd: FormData) {
 // ---------------------------------------------------------------------------
 
 function memberFields(fd: FormData) {
-  const position: Position = str(fd, "position") === "goleiro" ? "goleiro" : "linha";
+  const value = str(fd, "position");
+  const position: Position = ALL_POSITIONS.includes(value as Position) ? (value as Position) : "linha";
   const kind: MemberKind = str(fd, "kind") === "mensalista" ? "mensalista" : "avulso";
   return { name: str(fd, "name").slice(0, 60), position, kind };
 }
@@ -230,10 +233,13 @@ export async function createFixedTeams(fd: FormData) {
   const groupId = str(fd, "group_id");
   const month = str(fd, "month");
   if (!isMonth(month)) return;
-  const { supabase, members, isOrganizer } = await getGroupContext(groupId);
+  const { supabase, group, members, isOrganizer } = await getGroupContext(groupId);
   if (!isOrganizer) return;
   const count = clampInt(str(fd, "teams"), 2, 8, 2);
-  const mensalistas = members.filter((m) => m.active && m.kind === "mensalista").map(toDrawPlayer);
+  const sport = sportOf(group.sport);
+  const mensalistas = members
+    .filter((m) => m.active && m.kind === "mensalista")
+    .map((m) => toDrawPlayer(sport, m));
   const drawn = str(fd, "fill") === "1" && mensalistas.length >= 2 ? drawTeams(mensalistas, count) : [];
   await supabase.from("fixed_teams").insert(
     Array.from({ length: count }, (_, i) => ({
@@ -402,21 +408,24 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
 
   const name = str(fd, "name");
   if (name.length < 2) return { error: "O nome precisa ter pelo menos 2 letras." };
-  const { error } = await supabase
+  const fields = {
+    name: name.slice(0, 60),
+    location: str(fd, "location").slice(0, 120),
+    weekday: clampInt(str(fd, "weekday"), 0, 6, 4),
+    start_time: str(fd, "start_time") || "20:00",
+    max_players: clampInt(str(fd, "max_players"), 4, 80, 18),
+    players_per_team: clampInt(str(fd, "players_per_team"), 2, 11, 6),
+    priority_hours: clampInt(str(fd, "priority_hours"), 0, 168, 24),
+    monthly_fee_cents: parseMoney(str(fd, "monthly_fee")),
+    single_fee_cents: parseMoney(str(fd, "single_fee")),
+    pix_key: str(fd, "pix_key").slice(0, 140),
+  };
+  let { error } = await supabase
     .from("groups")
-    .update({
-      name: name.slice(0, 60),
-      location: str(fd, "location").slice(0, 120),
-      weekday: clampInt(str(fd, "weekday"), 0, 6, 4),
-      start_time: str(fd, "start_time") || "20:00",
-      max_players: clampInt(str(fd, "max_players"), 4, 80, 18),
-      players_per_team: clampInt(str(fd, "players_per_team"), 2, 11, 6),
-      priority_hours: clampInt(str(fd, "priority_hours"), 0, 168, 24),
-      monthly_fee_cents: parseMoney(str(fd, "monthly_fee")),
-      single_fee_cents: parseMoney(str(fd, "single_fee")),
-      pix_key: str(fd, "pix_key").slice(0, 140),
-    })
+    .update({ ...fields, sport: sportOf(str(fd, "sport")) })
     .eq("id", groupId);
+  // Sem a migração das modalidades a coluna sport não existe: salva o resto.
+  if (error) ({ error } = await supabase.from("groups").update(fields).eq("id", groupId));
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
   refresh();
   return { ok: true };

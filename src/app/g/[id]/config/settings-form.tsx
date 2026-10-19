@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { ErrorText, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { WEEKDAYS } from "@/lib/format";
+import { SPORTS, sportOf } from "@/lib/sports";
 import type { Group } from "@/lib/types";
 import { saveSettings } from "../actions";
 
@@ -20,6 +21,13 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
         </Field>
         <Field label="Local">
           <Input name="location" defaultValue={group.location} maxLength={120} />
+        </Field>
+        <Field label="Modalidade" hint="Muda as posições que aparecem para os jogadores.">
+          <Select name="sport" defaultValue={sportOf(group.sport)}>
+            {SPORTS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </Select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Dia">
@@ -38,7 +46,7 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
           <Field label="Vagas por jogo">
             <Input name="max_players" type="number" min={4} max={80} defaultValue={group.max_players} />
           </Field>
-          <Field label="Jogadores por time" hint="Com o goleiro.">
+          <Field label="Jogadores por time" hint={sportOf(group.sport) === "volei" ? "Em quadra, por time." : "Com o goleiro."}>
             <Input name="players_per_team" type="number" min={2} max={11} defaultValue={group.players_per_team} />
           </Field>
         </div>

@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/submit";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { WEEKDAYS } from "@/lib/format";
+import { SPORTS, sportOf } from "@/lib/sports";
 
 export const metadata: Metadata = { title: "Nova pelada" };
 
@@ -22,6 +23,7 @@ async function createGroup(formData: FormData) {
     p_organizer_name: user.name,
   });
   if (error || !data) redirect("/grupos/novo?erro=1");
+  await supabase.from("groups").update({ sport: sportOf(String(formData.get("sport"))) }).eq("id", data);
   redirect(`/g/${data}/config?novo=1`);
 }
 
@@ -39,6 +41,13 @@ export default async function NewGroupPage({ searchParams }: PageProps<"/grupos/
           </Field>
           <Field label="Local">
             <Input name="location" placeholder="Ex.: Arena Society, quadra 2" maxLength={120} />
+          </Field>
+          <Field label="Modalidade" hint="Define as posições dos jogadores.">
+            <Select name="sport" defaultValue="society">
+              {SPORTS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </Select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Dia">

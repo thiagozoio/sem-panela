@@ -1,5 +1,6 @@
 import { formatGameDate, formatMoney } from "./format";
 import type { ListEntry } from "./attendance";
+import { byPosition, positionInfo, type Sport } from "./sports";
 import type { Team } from "./types";
 
 export function listMessage(
@@ -9,10 +10,11 @@ export function listMessage(
   waitlist: ListEntry[],
   maxPlayers: number,
   link: string,
+  sport: Sport,
 ): string {
-  const lines = [`⚽ *${groupName}*`, formatGameDate(startsAt), ""];
+  const lines = [`${sport === "volei" ? "🏐" : "⚽"} *${groupName}*`, formatGameDate(startsAt), ""];
   lines.push(`*Confirmados (${confirmed.length}/${maxPlayers})*`);
-  confirmed.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}${e.member.position === "goleiro" ? " 🧤" : ""}`));
+  confirmed.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}${positionSuffix(sport, e.member.position)}`));
   if (waitlist.length) {
     lines.push("", "*Lista de espera*");
     waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}`));
@@ -21,11 +23,20 @@ export function listMessage(
   return lines.join("\n");
 }
 
-export function teamsMessage(groupName: string, startsAt: string, teams: Team[]): string {
-  const lines = [`⚽ *${groupName}*: times`, formatGameDate(startsAt)];
+function positionSuffix(sport: Sport, position: string): string {
+  const info = positionInfo(sport, position);
+  if (!info) return "";
+  return info.value === "goleiro" ? " 🧤" : ` (${info.label.toLowerCase()})`;
+}
+
+export function teamsMessage(groupName: string, startsAt: string, teams: Team[], sport: Sport): string {
+  const lines = [`${sport === "volei" ? "🏐" : "⚽"} *${groupName}*: times`, formatGameDate(startsAt)];
   for (const t of teams) {
     lines.push("", `*${t.name}*`);
-    t.players.forEach((p) => lines.push(`${p.position === "goleiro" ? "🧤" : "•"} ${p.name}`));
+    [...t.players].sort(byPosition(sport)).forEach((p) => {
+      const info = positionInfo(sport, p.position);
+      lines.push(info?.value === "goleiro" ? `🧤 ${p.name}` : `• ${p.name}${info ? ` (${info.label.toLowerCase()})` : ""}`);
+    });
   }
   lines.push("", "Times do Sem Panela, sem panelinha 😉");
   return lines.join("\n");
