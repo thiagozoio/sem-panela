@@ -3,6 +3,7 @@ import { BillingBanner } from "@/components/billing-banner";
 import { GroupTabs } from "@/components/group-tabs";
 import { getGroupContext } from "@/lib/groups";
 import { WEEKDAYS } from "@/lib/format";
+import { rankingOf } from "@/lib/standings";
 
 export default async function GroupLayout({ children, params }: LayoutProps<"/g/[id]">) {
   const { id } = await params;
@@ -18,7 +19,7 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
         </p>
       </div>
       <BillingBanner state={subscription} paidUntil={group.paid_until} organizer={isOrganizer} groupName={group.name} />
-      <GroupTabs groupId={group.id} organizer={isOrganizer} />
+      <GroupTabs groupId={group.id} organizer={isOrganizer} ranking={rankingOf(group.ranking) !== "off"} />
       {children}
     </AppShell>
   );

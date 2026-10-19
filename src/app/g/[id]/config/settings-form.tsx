@@ -5,6 +5,7 @@ import { ErrorText, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { WEEKDAYS } from "@/lib/format";
 import { SPORTS, sportOf } from "@/lib/sports";
+import { RANKING_MODES, rankingOf } from "@/lib/standings";
 import type { Group } from "@/lib/types";
 import { saveSettings } from "../actions";
 
@@ -26,6 +27,16 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
           <Select name="sport" defaultValue={sportOf(group.sport)}>
             {SPORTS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label="Classificação"
+          hint="Tabela com vitórias, empates, derrotas e saldo de gols, montada pelos placares dos jogos, e o histórico de campeões."
+        >
+          <Select name="ranking" defaultValue={rankingOf(group.ranking)}>
+            {RANKING_MODES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
             ))}
           </Select>
         </Field>

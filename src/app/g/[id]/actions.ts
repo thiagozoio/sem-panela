@@ -8,6 +8,7 @@ import { drawTeams, type DrawPlayer } from "@/lib/draw";
 import { teamsFromFixed } from "@/lib/fixed-teams";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
+import { rankingOf } from "@/lib/standings";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -324,6 +325,39 @@ export async function setPlayerTeam(fd: FormData) {
 }
 
 // ---------------------------------------------------------------------------
+// Classificação: campeonatos com datas
+// ---------------------------------------------------------------------------
+
+const isDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+
+export type ChampionshipState = { ok?: boolean; error?: string };
+
+/** Cria um campeonato (ou muda, com championship_id): nome, início e fim. */
+export async function saveChampionship(_prev: ChampionshipState, fd: FormData): Promise<ChampionshipState> {
+  const groupId = str(fd, "group_id");
+  const id = str(fd, "championship_id");
+  const name = str(fd, "name").slice(0, 60);
+  const starts_on = str(fd, "starts_on");
+  const ends_on = str(fd, "ends_on");
+  if (!name) return { error: "Dê um nome, como “1º turno 2026”." };
+  if (!isDay(starts_on) || !isDay(ends_on)) return { error: "Escolha as datas de início e fim." };
+  if (ends_on < starts_on) return { error: "O fim precisa ser depois do início." };
+  const supabase = await createClient();
+  const { error } = id
+    ? await supabase.from("championships").update({ name, starts_on, ends_on }).eq("id", id).eq("group_id", groupId)
+    : await supabase.from("championships").insert({ group_id: groupId, name, starts_on, ends_on });
+  if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteChampionship(fd: FormData) {
+  const supabase = await createClient();
+  await supabase.from("championships").delete().eq("id", str(fd, "championship_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+// ---------------------------------------------------------------------------
 // Financeiro
 // ---------------------------------------------------------------------------
 
@@ -420,11 +454,13 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
     single_fee_cents: parseMoney(str(fd, "single_fee")),
     pix_key: str(fd, "pix_key").slice(0, 140),
   };
+  const sport = sportOf(str(fd, "sport"));
   let { error } = await supabase
     .from("groups")
-    .update({ ...fields, sport: sportOf(str(fd, "sport")) })
+    .update({ ...fields, sport, ranking: rankingOf(str(fd, "ranking")) })
     .eq("id", groupId);
-  // Sem a migração das modalidades a coluna sport não existe: salva o resto.
+  // Sem as migrações da classificação ou das modalidades a coluna não existe: salva o resto.
+  if (error) ({ error } = await supabase.from("groups").update({ ...fields, sport }).eq("id", groupId));
   if (error) ({ error } = await supabase.from("groups").update(fields).eq("id", groupId));
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
   refresh();
