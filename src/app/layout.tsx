@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { themeScript } from "@/lib/theme";
+import { RefreshOnReturn } from "@/components/refresh-on-return";
 
 export const metadata: Metadata = {
   title: { default: "Sem Panela", template: "%s · Sem Panela" },
@@ -21,7 +22,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <RefreshOnReturn />
+      </body>
     </html>
   );
 }
