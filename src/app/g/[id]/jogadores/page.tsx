@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Badge, Button, Card, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
+import { positionInfo, positionOf, positionOptions, sportOf, type Sport } from "@/lib/sports";
 import type { Member } from "@/lib/types";
 import { addMember, setMemberActive, updateMember } from "../actions";
 import { OrganizerButton } from "./organizer-button";
@@ -16,7 +17,7 @@ const SKILLS = [
   [5, "5 · Craque"],
 ] as const;
 
-function MemberFields({ member }: { member?: Member }) {
+function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2">
@@ -25,9 +26,10 @@ function MemberFields({ member }: { member?: Member }) {
         </Field>
       </div>
       <Field label="Posição">
-        <Select name="position" defaultValue={member?.position ?? "linha"}>
-          <option value="linha">Linha</option>
-          <option value="goleiro">Goleiro</option>
+        <Select name="position" defaultValue={positionOf(sport, member?.position ?? "linha")}>
+          {positionOptions(sport).map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
         </Select>
       </Field>
       <Field label="Nível">
@@ -55,6 +57,7 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
   const active = members.filter((m) => m.active);
   const inactive = members.filter((m) => !m.active);
   const canEdit = isOrganizer && !readOnly;
+  const sport = sportOf(group.sport);
 
   return (
     <div className="space-y-4">
@@ -69,13 +72,13 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
               {canEdit ? (
                 <details>
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
-                    <PlayerSummary member={m} showSkill />
+                    <PlayerSummary member={m} sport={sport} showSkill />
                     <span className="text-xs text-pitch-700">editar</span>
                   </summary>
                   <form action={updateMember} className="mt-3 space-y-3 rounded-xl bg-neutral-50 p-3">
                     <input type="hidden" name="group_id" value={group.id} />
                     <input type="hidden" name="member_id" value={m.id} />
-                    <MemberFields member={m} />
+                    <MemberFields member={m} sport={sport} />
                     <div className="flex flex-wrap gap-2">
                       <SubmitButton>Salvar</SubmitButton>
                       {!m.is_organizer && (
@@ -94,7 +97,7 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
                   </div>
                 </details>
               ) : (
-                <PlayerSummary member={m} showSkill={false} />
+                <PlayerSummary member={m} sport={sport} showSkill={false} />
               )}
             </li>
           ))}
@@ -116,7 +119,7 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
             </p>
             <form action={addMember} className="mt-3 space-y-3">
               <input type="hidden" name="group_id" value={group.id} />
-              <MemberFields />
+              <MemberFields sport={sport} />
               <SubmitButton className="w-full">Cadastrar</SubmitButton>
             </form>
           </details>
@@ -146,11 +149,12 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
   );
 }
 
-function PlayerSummary({ member, showSkill }: { member: Member; showSkill: boolean }) {
+function PlayerSummary({ member, sport, showSkill }: { member: Member; sport: Sport; showSkill: boolean }) {
+  const position = positionInfo(sport, member.position);
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="font-medium">{member.name}</span>
-      {member.position === "goleiro" && <Badge tone="amber">goleiro</Badge>}
+      {position && <Badge tone={position.value === "goleiro" ? "amber" : "neutral"}>{position.label.toLowerCase()}</Badge>}
       <Badge tone={member.kind === "mensalista" ? "green" : "neutral"}>{member.kind}</Badge>
       {member.is_organizer && <Badge>organizador</Badge>}
       {!member.user_id && <Badge>sem conta</Badge>}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { drawTeams, spread, suggestedTeams, type DrawPlayer } from "../draw";
+import type { Position } from "../types";
 
 function seeded(seed: number) {
   return () => {
@@ -59,6 +60,51 @@ describe("drawTeams", () => {
     const a = JSON.stringify(drawTeams(all, 2, seeded(1)));
     const b = JSON.stringify(drawTeams(all, 2, seeded(99)));
     expect(a).not.toEqual(b);
+  });
+});
+
+describe("drawTeams com posições", () => {
+  const pos = (position: Position, count: number, skills: number[]): DrawPlayer[] =>
+    Array.from({ length: count }, (_, i) => ({
+      member_id: `${position}${i}`,
+      name: `${position} ${i}`,
+      position,
+      skill: skills[i % skills.length],
+    }));
+
+  it("espalha cada posição entre os times", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const all = [
+        ...pos("goleiro", 2, [4, 2]),
+        ...pos("zagueiro", 4, [5, 4, 2, 1]),
+        ...pos("meio", 4, [3, 3, 5, 1]),
+        ...pos("atacante", 3, [5, 2, 4]),
+        ...pos("linha", 3, [3, 1, 4]),
+      ];
+      const teams = drawTeams(all, 2, seeded(seed));
+      for (const p of ["zagueiro", "meio"] as const) {
+        expect(teams.map((t) => t.players.filter((x) => x.position === p).length)).toEqual([2, 2]);
+      }
+      const atk = teams.map((t) => t.players.filter((x) => x.position === "atacante").length);
+      expect(Math.abs(atk[0] - atk[1])).toBe(1);
+      const sizes = teams.map((t) => t.players.length);
+      expect(Math.abs(sizes[0] - sizes[1])).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("vôlei sem goleiro: levantadores um por time", () => {
+    const all = [
+      ...pos("levantador", 2, [5, 3]),
+      ...pos("ponteiro", 4, [4, 4, 2, 3]),
+      ...pos("central", 2, [3, 2]),
+      ...pos("linha", 4, [3, 3, 1, 5]),
+    ];
+    const teams = drawTeams(all, 2, seeded(7));
+    for (const t of teams) {
+      expect(t.players.filter((x) => x.position === "levantador")).toHaveLength(1);
+      expect(t.players.filter((x) => x.position === "ponteiro")).toHaveLength(2);
+      expect(t.players).toHaveLength(6);
+    }
   });
 });
 

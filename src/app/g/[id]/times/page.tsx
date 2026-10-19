@@ -4,6 +4,7 @@ import { MonthNav } from "@/components/month-nav";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { addMonths, monthLabel, monthParam } from "@/lib/format";
+import { byPosition, positionInfo, sportOf } from "@/lib/sports";
 import type { FixedTeam, Member } from "@/lib/types";
 import { addFixedTeam, copyFixedTeams, createFixedTeams, deleteFixedTeam, renameFixedTeam, setPlayerTeam } from "../actions";
 
@@ -28,8 +29,14 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
   const byId = new Map(members.map((m) => [m.id, m]));
   const inTeam = new Set(teams.flatMap((t) => t.member_ids));
   const withoutTeam = members.filter((m) => m.active && !inTeam.has(m.id));
-  const order = (a: Member, b: Member) =>
-    Number(b.position === "goleiro") - Number(a.position === "goleiro") || a.name.localeCompare(b.name, "pt-BR");
+  const sport = sportOf(group.sport);
+  const order = byPosition(sport);
+  const tag = (m: Member) => {
+    const info = positionInfo(sport, m.position);
+    if (!info) return null;
+    return info.value === "goleiro" ? null : <span className="text-xs text-neutral-500"> {info.short}</span>;
+  };
+  const keeper = (m: Member) => (positionInfo(sport, m.position)?.value === "goleiro" ? "🧤 " : "");
 
   const hidden = (
     <>
@@ -122,8 +129,9 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
                       {players.sort(order).map((m) => (
                         <li key={m.id} className="flex items-center justify-between gap-2 py-1.5">
                           <span>
-                            {m.position === "goleiro" ? "🧤 " : ""}
+                            {keeper(m)}
                             {m.name}
+                            {tag(m)}
                           </span>
                           {canEdit && teamPicker(m, t.id)}
                         </li>
@@ -152,8 +160,9 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
                 {withoutTeam.sort(order).map((m) => (
                   <li key={m.id} className="flex items-center justify-between gap-2 py-1.5">
                     <span>
-                      {m.position === "goleiro" ? "🧤 " : ""}
+                      {keeper(m)}
                       {m.name}
+                      {tag(m)}
                       {m.kind === "avulso" && <span className="text-neutral-400"> · avulso</span>}
                     </span>
                     {teamPicker(m, "")}

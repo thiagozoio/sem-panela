@@ -1,4 +1,6 @@
-export type Position = "linha" | "goleiro";
+import type { Position, Sport } from "./sports";
+
+export type { Position, Sport };
 export type MemberKind = "mensalista" | "avulso";
 
 export type Group = {
@@ -17,6 +19,8 @@ export type Group = {
   owner_id: string;
   paid_until: string;
   cash_start_cents: number;
+  /** Modalidade; define as posições. Antes da migração 20261019120000 vem vazio. */
+  sport?: Sport;
   created_at: string;
 };
 

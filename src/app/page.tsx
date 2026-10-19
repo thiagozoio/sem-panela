@@ -6,7 +6,7 @@ import { PRICE_CENTS } from "@/lib/subscription";
 
 const features = [
   ["📋", "Lista de presença", "O jogador confirma com um toque. Lotou? Vai para a lista de espera, com prioridade para mensalista."],
-  ["⚖️", "Times sem panelinha", "Sorteio equilibrado pelo nível de cada um, com um goleiro por time. Não gostou? Sorteia de novo."],
+  ["⚖️", "Times sem panelinha", "Sorteio equilibrado pelo nível e pela posição de cada um, com um goleiro por time. Futsal, society, campo ou vôlei. Não gostou? Sorteia de novo."],
   ["💰", "Quem pagou, quem deve", "Mensalidade e avulso marcados num lugar só, com a cobrança pronta para mandar no grupo."],
   ["📲", "Tudo pelo WhatsApp", "Um link no grupo e pronto. Funciona no navegador do celular, sem baixar nada."],
 ];
