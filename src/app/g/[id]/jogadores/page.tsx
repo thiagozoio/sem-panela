@@ -3,6 +3,7 @@ import { Badge, Button, Card, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { positionInfo, positionOf, positionOptions, sportOf, type Sport } from "@/lib/sports";
+import { formatPhone, whatsappTo } from "@/lib/matches";
 import type { Member } from "@/lib/types";
 import { addMember, setMemberActive, updateMember } from "../actions";
 import { OrganizerButton } from "./organizer-button";
@@ -40,6 +41,11 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
         </Select>
       </Field>
       <div className="col-span-2">
+        <Field label="Telefone (WhatsApp)" hint="Opcional. Só os organizadores veem.">
+          <Input name="phone" type="tel" inputMode="tel" defaultValue={member?.phone} placeholder="(47) 99999-9999" maxLength={30} />
+        </Field>
+      </div>
+      <div className="col-span-2">
         <Field label="Tipo">
           <Select name="kind" defaultValue={member?.kind ?? "avulso"}>
             <option value="mensalista">Mensalista</option>
@@ -75,6 +81,7 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
                     <PlayerSummary member={m} sport={sport} showSkill />
                     <span className="text-xs text-pitch-700">editar</span>
                   </summary>
+                  {m.phone && <PhoneLink phone={m.phone} className="mt-2" />}
                   <form action={updateMember} className="mt-3 space-y-3 rounded-xl bg-neutral-50 p-3">
                     <input type="hidden" name="group_id" value={group.id} />
                     <input type="hidden" name="member_id" value={m.id} />
@@ -160,5 +167,17 @@ function PlayerSummary({ member, sport, showSkill }: { member: Member; sport: Sp
       {!member.user_id && <Badge>sem conta</Badge>}
       {showSkill && <span className="text-amber-600">{"★".repeat(member.skill)}</span>}
     </div>
+  );
+}
+
+function PhoneLink({ phone, className = "" }: { phone: string; className?: string }) {
+  const href = whatsappTo(phone);
+  const label = `📞 ${formatPhone(phone)}`;
+  return href ? (
+    <a href={href} target="_blank" rel="noreferrer" className={`block text-sm font-medium text-pitch-700 ${className}`}>
+      {label} · WhatsApp
+    </a>
+  ) : (
+    <p className={`text-sm text-neutral-600 ${className}`}>{label}</p>
   );
 }

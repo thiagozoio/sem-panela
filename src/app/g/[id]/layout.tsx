@@ -19,7 +19,12 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
         </p>
       </div>
       <BillingBanner state={subscription} paidUntil={group.paid_until} organizer={isOrganizer} groupName={group.name} />
-      <GroupTabs groupId={group.id} organizer={isOrganizer} ranking={rankingOf(group.ranking) !== "off"} />
+      <GroupTabs
+        groupId={group.id}
+        organizer={isOrganizer}
+        ranking={rankingOf(group.ranking) !== "off"}
+        matches={!!group.matches}
+      />
       {children}
     </AppShell>
   );

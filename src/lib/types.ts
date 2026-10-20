@@ -24,6 +24,8 @@ export type Group = {
   sport?: Sport;
   /** Classificação ligada pelo organizador. Antes da migração 20261019180000 vem vazio. */
   ranking?: RankingMode;
+  /** Aba de amistosos (jogos contra outros times). Antes da migração 20261020000000 vem vazio. */
+  matches?: boolean;
   created_at: string;
 };
 
@@ -35,6 +37,8 @@ export type Member = {
   position: Position;
   /** Vem de member_skills; só o organizador recebe o valor real (padrão 3). */
   skill: number;
+  /** Vem de member_contacts; só o organizador recebe (vazio para os outros). */
+  phone: string;
   kind: MemberKind;
   is_organizer: boolean;
   active: boolean;
@@ -90,5 +94,19 @@ export type Expense = {
   month: string;
   description: string;
   amount_cents: number;
+  created_at: string;
+};
+
+export type Match = {
+  id: string;
+  group_id: string;
+  starts_at: string;
+  opponent: string;
+  location: string;
+  contact_name: string;
+  contact_phone: string;
+  notes: string;
+  our_score: number | null;
+  their_score: number | null;
   created_at: string;
 };

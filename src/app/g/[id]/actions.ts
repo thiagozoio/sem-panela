@@ -8,6 +8,7 @@ import { drawTeams, type DrawPlayer } from "@/lib/draw";
 import { teamsFromFixed } from "@/lib/fixed-teams";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
+import { brazilDateTime } from "@/lib/matches";
 import { rankingOf } from "@/lib/standings";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
@@ -176,13 +177,24 @@ async function saveSkill(supabase: Client, groupId: string, memberId: string, sk
   else await supabase.from("member_skills").insert({ member_id: memberId, group_id: groupId, skill });
 }
 
+/** Telefone do jogador (só o organizador vê). Sem a migração 20261020000000 não faz nada. */
+async function savePhone(supabase: Client, groupId: string, memberId: string, phone: string) {
+  const { data, error } = await supabase.from("member_contacts").select("member_id").eq("member_id", memberId).maybeSingle();
+  if (error) return;
+  if (data) await supabase.from("member_contacts").update({ phone }).eq("member_id", memberId);
+  else if (phone) await supabase.from("member_contacts").insert({ member_id: memberId, group_id: groupId, phone });
+}
+
 export async function addMember(fd: FormData) {
   const groupId = str(fd, "group_id");
   const supabase = await createClient();
   const fields = memberFields(fd);
   if (!fields.name) return;
   const { data } = await supabase.from("members").insert({ group_id: groupId, ...fields }).select("id").single();
-  if (data) await saveSkill(supabase, groupId, data.id, clampInt(str(fd, "skill"), 1, 5, 3));
+  if (data) {
+    await saveSkill(supabase, groupId, data.id, clampInt(str(fd, "skill"), 1, 5, 3));
+    await savePhone(supabase, groupId, data.id, str(fd, "phone").slice(0, 30));
+  }
   refresh();
 }
 
@@ -194,6 +206,7 @@ export async function updateMember(fd: FormData) {
   if (!fields.name) return;
   await supabase.from("members").update(fields).eq("id", memberId).eq("group_id", groupId);
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
+  await savePhone(supabase, groupId, memberId, str(fd, "phone").slice(0, 30));
   refresh();
 }
 
@@ -358,6 +371,60 @@ export async function deleteChampionship(fd: FormData) {
 }
 
 // ---------------------------------------------------------------------------
+// Amistosos: jogos contra outros times
+// ---------------------------------------------------------------------------
+
+export type MatchState = { ok?: boolean; error?: string };
+
+/** Marca um amistoso (ou muda, com match_id): data, adversário, local e contato de lá. */
+export async function saveMatch(_prev: MatchState, fd: FormData): Promise<MatchState> {
+  const groupId = str(fd, "group_id");
+  const id = str(fd, "match_id");
+  const opponent = str(fd, "opponent").slice(0, 60);
+  const starts_at = brazilDateTime(str(fd, "day"), str(fd, "time"));
+  if (!opponent) return { error: "Coloque o nome do time adversário." };
+  if (!starts_at) return { error: "Escolha o dia e o horário do jogo." };
+  const fields = {
+    opponent,
+    starts_at,
+    location: str(fd, "location").slice(0, 120),
+    contact_name: str(fd, "contact_name").slice(0, 60),
+    contact_phone: str(fd, "contact_phone").slice(0, 30),
+    notes: str(fd, "notes").slice(0, 280),
+  };
+  const supabase = await createClient();
+  const { error } = id
+    ? await supabase.from("matches").update(fields).eq("id", id).eq("group_id", groupId)
+    : await supabase.from("matches").insert({ group_id: groupId, ...fields });
+  if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
+  refresh();
+  return { ok: true };
+}
+
+/** Placar do amistoso; os dois campos vazios apagam o placar. */
+export async function saveMatchScore(fd: FormData) {
+  const ours = str(fd, "our_score");
+  const theirs = str(fd, "their_score");
+  const both = ours !== "" && theirs !== "";
+  const supabase = await createClient();
+  await supabase
+    .from("matches")
+    .update({
+      our_score: both ? clampInt(ours, 0, 99, 0) : null,
+      their_score: both ? clampInt(theirs, 0, 99, 0) : null,
+    })
+    .eq("id", str(fd, "match_id"))
+    .eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+export async function deleteMatch(fd: FormData) {
+  const supabase = await createClient();
+  await supabase.from("matches").delete().eq("id", str(fd, "match_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
+// ---------------------------------------------------------------------------
 // Financeiro
 // ---------------------------------------------------------------------------
 
@@ -455,11 +522,13 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
     pix_key: str(fd, "pix_key").slice(0, 140),
   };
   const sport = sportOf(str(fd, "sport"));
+  const ranking = rankingOf(str(fd, "ranking"));
   let { error } = await supabase
     .from("groups")
-    .update({ ...fields, sport, ranking: rankingOf(str(fd, "ranking")) })
+    .update({ ...fields, sport, ranking, matches: str(fd, "matches") === "1" })
     .eq("id", groupId);
-  // Sem as migrações da classificação ou das modalidades a coluna não existe: salva o resto.
+  // Sem as migrações dos amistosos, da classificação ou das modalidades a coluna não existe: salva o resto.
+  if (error) ({ error } = await supabase.from("groups").update({ ...fields, sport, ranking }).eq("id", groupId));
   if (error) ({ error } = await supabase.from("groups").update({ ...fields, sport }).eq("id", groupId));
   if (error) ({ error } = await supabase.from("groups").update(fields).eq("id", groupId));
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
