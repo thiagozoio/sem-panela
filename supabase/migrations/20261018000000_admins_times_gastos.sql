@@ -42,6 +42,7 @@ create table public.fixed_teams (
   member_ids uuid[] not null default '{}',
   created_at timestamptz not null default now()
 );
+grant select, insert, update, delete on public.fixed_teams to authenticated, service_role;
 create index fixed_teams_group_month_idx on public.fixed_teams (group_id, month);
 
 alter table public.fixed_teams enable row level security;
@@ -72,6 +73,7 @@ create table public.expenses (
   amount_cents integer not null check (amount_cents >= 0),
   created_at timestamptz not null default now()
 );
+grant select, insert, update, delete on public.expenses to authenticated, service_role;
 create index expenses_group_month_idx on public.expenses (group_id, month);
 
 alter table public.expenses enable row level security;

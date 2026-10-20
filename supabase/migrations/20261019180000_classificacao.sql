@@ -17,6 +17,7 @@ create table public.championships (
   created_at timestamptz not null default now(),
   check (ends_on >= starts_on)
 );
+grant select, insert, update, delete on public.championships to authenticated, service_role;
 create index championships_group_idx on public.championships (group_id, starts_on);
 
 alter table public.championships enable row level security;

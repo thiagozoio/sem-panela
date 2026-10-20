@@ -11,6 +11,7 @@ create table public.member_contacts (
   group_id uuid not null references public.groups (id) on delete cascade,
   phone text not null default '' check (char_length(phone) <= 30)
 );
+grant select, insert, update, delete on public.member_contacts to authenticated, service_role;
 
 alter table public.member_contacts enable row level security;
 create policy "telefone: organizador lê" on public.member_contacts
@@ -40,6 +41,7 @@ create table public.matches (
   created_at timestamptz not null default now(),
   check ((our_score is null) = (their_score is null))
 );
+grant select, insert, update, delete on public.matches to authenticated, service_role;
 create index matches_group_idx on public.matches (group_id, starts_at);
 
 alter table public.matches enable row level security;

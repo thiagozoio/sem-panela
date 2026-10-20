@@ -21,6 +21,7 @@ create table public.game_goals (
   goals smallint not null check (goals between 1 and 50),
   primary key (game_id, member_id)
 );
+grant select, insert, update, delete on public.game_goals to authenticated, service_role;
 
 alter table public.game_goals enable row level security;
 create policy "gol: membros leem" on public.game_goals
@@ -67,6 +68,7 @@ create table public.game_ratings (
   primary key (game_id, rater_id, rated_id),
   check (rater_id <> rated_id)
 );
+grant select, insert, update, delete on public.game_ratings to authenticated, service_role;
 
 alter table public.game_ratings enable row level security;
 create policy "nota: ler as próprias" on public.game_ratings
