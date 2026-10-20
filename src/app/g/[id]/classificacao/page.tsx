@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button, Card, LinkButton } from "@/components/ui";
-import { UpgradeCard } from "@/components/billing-banner";
 import { MonthNav } from "@/components/month-nav";
 import { ShareButtons } from "@/components/share";
 import { monthLabel, monthParam, monthStart } from "@/lib/format";
@@ -29,8 +28,8 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const sp = await searchParams;
   const data = await loadRanking(id);
-  const { group, isOrganizer, locked, mode, sport, today, games, championships, fixedNames, nameOf } = data;
-  const canEdit = isOrganizer && !locked;
+  const { group, isOrganizer, readOnly, mode, sport, today, games, championships, fixedNames, nameOf } = data;
+  const canEdit = isOrganizer && !readOnly;
   const base = `/g/${group.id}/classificacao`;
 
   if (mode === "off") {
@@ -63,7 +62,6 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
-      {locked && <UpgradeCard feature="A tabela de classificação" organizer={isOrganizer} groupName={group.name} />}
       {mode === "mensal" && <MonthNav month={month} />}
 
       {mode === "campeonato" && championships.length > 0 && (

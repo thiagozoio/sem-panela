@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Button, Card, Input, Select } from "@/components/ui";
-import { UpgradeCard } from "@/components/billing-banner";
 import { MonthNav } from "@/components/month-nav";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
@@ -14,8 +13,8 @@ export const metadata: Metadata = { title: "Times do mês" };
 export default async function FixedTeamsPage({ params, searchParams }: PageProps<"/g/[id]/times">) {
   const { id } = await params;
   const month = monthParam((await searchParams).mes);
-  const { supabase, group, members, isOrganizer, locked } = await getGroupContext(id);
-  const canEdit = isOrganizer && !locked;
+  const { supabase, group, members, isOrganizer, readOnly } = await getGroupContext(id);
+  const canEdit = isOrganizer && !readOnly;
 
   const { data } = await supabase
     .from("fixed_teams")
@@ -66,7 +65,6 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
 
   return (
     <div className="space-y-4">
-      {locked && <UpgradeCard feature="Times fixos do mês" organizer={isOrganizer} groupName={group.name} />}
       <MonthNav month={month} />
 
       {teams.length === 0 ? (

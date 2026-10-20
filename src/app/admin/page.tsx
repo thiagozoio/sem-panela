@@ -27,8 +27,8 @@ async function setPaidUntil(fd: FormData) {
   refresh();
 }
 
-const tones = { ok: "green", due_soon: "amber", grace: "red", free: "neutral" } as const;
-const labels = { ok: "em dia", due_soon: "vence logo", grace: "vencido", free: "plano grátis" } as const;
+const tones = { ok: "green", due_soon: "amber", grace: "red", read_only: "red" } as const;
+const labels = { ok: "em dia", due_soon: "vence logo", grace: "vencido", read_only: "bloqueado" } as const;
 
 export default async function AdminPage() {
   const user = await requireUser("/admin");
@@ -37,11 +37,11 @@ export default async function AdminPage() {
   const { data } = await supabase.rpc("admin_list_groups");
   const groups = (data ?? []) as AdminGroup[];
   const today = todayInBrazil();
-  const paying = groups.filter((g) => subscriptionState(g.paid_until, today).status !== "free").length;
+  const paying = groups.filter((g) => subscriptionState(g.paid_until, today).status !== "read_only").length;
 
   return (
     <AppShell admin>
-      <PageHeader title="Admin" subtitle={`${groups.length} grupos · ${paying} no plano completo`} />
+      <PageHeader title="Admin" subtitle={`${groups.length} grupos · ${paying} ativos`} />
       {groups.map((g) => {
         const state = subscriptionState(g.paid_until, today);
         return (

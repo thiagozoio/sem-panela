@@ -11,14 +11,12 @@ import { saveSettings } from "../actions";
 
 const money = (cents: number) => (cents ? (cents / 100).toFixed(2).replace(".", ",") : "");
 
-/** Recursos do plano completo continuam configuráveis no grátis, só avisam que ficam bloqueados. */
-export function SettingsForm({ group, locked }: { group: Group; locked: boolean }) {
-  const premium = locked ? " (plano completo)" : "";
+export function SettingsForm({ group, disabled }: { group: Group; disabled: boolean }) {
   const [state, action] = useActionState(saveSettings, {});
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="group_id" value={group.id} />
-      <fieldset className="space-y-4">
+      <fieldset disabled={disabled} className="space-y-4">
         <Field label="Nome da pelada">
           <Input name="name" defaultValue={group.name} minLength={2} maxLength={60} required />
         </Field>
@@ -33,7 +31,7 @@ export function SettingsForm({ group, locked }: { group: Group; locked: boolean 
           </Select>
         </Field>
         <Field
-          label={`Classificação${premium}`}
+          label="Classificação"
           hint="Tabela com vitórias, empates, derrotas e saldo de gols, montada pelos placares dos jogos, e o histórico de campeões."
         >
           <Select name="ranking" defaultValue={rankingOf(group.ranking)}>
@@ -43,7 +41,7 @@ export function SettingsForm({ group, locked }: { group: Group; locked: boolean 
           </Select>
         </Field>
         <Field
-          label={`Jogos contra outros times${premium}`}
+          label="Jogos contra outros times"
           hint="Liga a aba Amistosos: agenda dos jogos contra outras equipes, com o contato do adversário, e o histórico de resultados."
         >
           <Select name="matches" defaultValue={group.matches ? "1" : "0"}>
@@ -79,14 +77,14 @@ export function SettingsForm({ group, locked }: { group: Group; locked: boolean 
           <Input name="priority_hours" type="number" min={0} max={168} defaultValue={group.priority_hours} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={`Mensalidade (R$)${premium}`}>
+          <Field label="Mensalidade (R$)">
             <Input name="monthly_fee" inputMode="decimal" placeholder="80,00" defaultValue={money(group.monthly_fee_cents)} />
           </Field>
           <Field label="Avulso por jogo (R$)">
             <Input name="single_fee" inputMode="decimal" placeholder="25,00" defaultValue={money(group.single_fee_cents)} />
           </Field>
         </div>
-        <Field label={`Sua chave Pix${premium}`} hint="Vai na mensagem de cobrança da turma.">
+        <Field label="Sua chave Pix" hint="Vai na mensagem de cobrança da turma.">
           <Input name="pix_key" defaultValue={group.pix_key} maxLength={140} />
         </Field>
         <ErrorText>{state.error}</ErrorText>

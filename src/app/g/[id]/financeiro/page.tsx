@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Button, Card, Input } from "@/components/ui";
-import { UpgradeCard } from "@/components/billing-banner";
 import { MonthNav } from "@/components/month-nav";
 import { SubmitButton } from "@/components/submit";
 import { ShareButtons } from "@/components/share";
@@ -26,7 +25,7 @@ type Row = {
 export default async function FinancePage({ params, searchParams }: PageProps<"/g/[id]/financeiro">) {
   const { id } = await params;
   const { mes } = await searchParams;
-  const { supabase, group, members, isOrganizer, locked } = await getGroupContext(id);
+  const { supabase, group, members, isOrganizer, readOnly } = await getGroupContext(id);
   if (!isOrganizer) notFound();
 
   const month = monthParam(mes);
@@ -122,17 +121,17 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
                 {formatMoney(row.payment.amount_cents)}
                 {row.payment.note && <span className="block text-xs">{row.payment.note}</span>}
               </span>
-              <Button className="w-28 whitespace-nowrap px-2 py-1.5" disabled={locked} title="Clique para desfazer">
+              <Button className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly} title="Clique para desfazer">
                 Pago ✓
               </Button>
             </span>
           ) : (
-            <Button variant="secondary" className="w-28 whitespace-nowrap px-2 py-1.5" disabled={locked}>
+            <Button variant="secondary" className="w-28 whitespace-nowrap px-2 py-1.5" disabled={readOnly}>
               Marcar pago
             </Button>
           )}
         </div>
-        {!row.payment && !locked && (
+        {!row.payment && !readOnly && (
           <details className="group">
             <summary className="w-fit cursor-pointer list-none text-xs text-pitch-700">Outro valor (multa, desconto)</summary>
             <div className="mt-1.5 flex gap-2">
@@ -159,7 +158,6 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
-      {locked && <UpgradeCard feature="O financeiro" organizer={true} groupName={group.name} />}
       <MonthNav month={month} />
 
       {(group.monthly_fee_cents === 0 || group.single_fee_cents === 0) && (
@@ -184,7 +182,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
             {formatMoney(group.cash_start_cents)}
           </p>
         </div>
-        {!locked && (
+        {!readOnly && (
           <details>
             <summary className="w-fit cursor-pointer list-none text-xs text-pitch-700">Mudar saldo inicial</summary>
             <form action={setCashStart} className="mt-2 flex gap-2">
@@ -282,7 +280,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
                   <input type="hidden" name="group_id" value={group.id} />
                   <input type="hidden" name="expense_id" value={e.id} />
                   <span className="text-neutral-500">{formatMoney(e.amount_cents)}</span>
-                  {!locked && (
+                  {!readOnly && (
                     <Button
                       variant="ghost"
                       className="px-2 py-1 text-red-700"
@@ -297,7 +295,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
             ))}
           </ul>
         )}
-        {!locked && (
+        {!readOnly && (
           <>
             <form action={addExpense} className="grid grid-cols-[1fr_auto] gap-2 border-t border-neutral-100 pt-3">
               <input type="hidden" name="group_id" value={group.id} />
