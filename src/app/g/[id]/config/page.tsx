@@ -44,9 +44,11 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
           {subscription.status === "read_only" ? "Venceu em " : "Paga até "}
           <strong>{formatDay(group.paid_until)}</strong>.
         </p>
-        <p className="text-neutral-600">
-          Para renovar: <PayInstructions groupName={group.name} /> A liberação é feita à mão em até 1 dia útil.
-        </p>
+        <div className="space-y-2 text-neutral-600">
+          <p>Para renovar:</p>
+          <PayInstructions groupName={group.name} />
+          <p>A liberação é feita à mão em até 1 dia útil.</p>
+        </div>
       </Card>
     </div>
   );

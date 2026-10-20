@@ -1,29 +1,44 @@
 import { formatDay, formatMoney } from "@/lib/format";
+import { CopyField } from "@/components/share";
 import { GRACE_DAYS, PRICE_CENTS, type SubscriptionState } from "@/lib/subscription";
 
-export const BILLING_PIX_KEY = process.env.NEXT_PUBLIC_BILLING_PIX_KEY ?? "";
-export const BILLING_WHATSAPP = process.env.NEXT_PUBLIC_BILLING_WHATSAPP ?? "";
+// Chave Pix (aleatória) e WhatsApp do Thiago para a mensalidade; as variáveis de ambiente sobrescrevem.
+export const BILLING_PIX_KEY = process.env.NEXT_PUBLIC_BILLING_PIX_KEY || "5ea585c2-560c-46f8-9a9b-c5228f365c99";
+export const BILLING_WHATSAPP = process.env.NEXT_PUBLIC_BILLING_WHATSAPP || "5547992037481";
+
+/** "5547992037481" -> "(47) 99203-7481" */
+function formatPhone(digits: string) {
+  const local = digits.replace(/^55/, "");
+  const m = local.match(/^(\d{2})(\d{4,5})(\d{4})$/);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : digits;
+}
 
 export function PayInstructions({ groupName }: { groupName: string }) {
   const text = `Oi! Segue o comprovante da mensalidade do Sem Panela do grupo "${groupName}".`;
   return (
-    <span>
-      Faça um Pix de <strong>{formatMoney(PRICE_CENTS)}</strong>
-      {BILLING_PIX_KEY && (
-        <>
-          {" "}para a chave <strong className="break-all">{BILLING_PIX_KEY}</strong>
-        </>
+    <div className="space-y-2">
+      <p>
+        Faça um Pix de <strong>{formatMoney(PRICE_CENTS)}</strong>
+        {BILLING_PIX_KEY ? " para a chave abaixo" : ""}
+        {BILLING_WHATSAPP ? (
+          <>
+            {" "}e mande o comprovante no WhatsApp <strong className="whitespace-nowrap">{formatPhone(BILLING_WHATSAPP)}</strong>
+          </>
+        ) : null}
+        . Plano anual: 12 meses pelo preço de 10.
+      </p>
+      {BILLING_PIX_KEY && <CopyField value={BILLING_PIX_KEY} />}
+      {BILLING_WHATSAPP && (
+        <a
+          className="inline-block font-semibold underline"
+          target="_blank"
+          rel="noreferrer"
+          href={`https://wa.me/${BILLING_WHATSAPP}?text=${encodeURIComponent(text)}`}
+        >
+          Mandar comprovante no WhatsApp
+        </a>
       )}
-      {BILLING_WHATSAPP ? (
-        <>
-          {" "}e{" "}
-          <a className="font-semibold underline" target="_blank" rel="noreferrer" href={`https://wa.me/${BILLING_WHATSAPP}?text=${encodeURIComponent(text)}`}>
-            mande o comprovante no WhatsApp
-          </a>
-        </>
-      ) : null}
-      . Plano anual: 12 meses pelo preço de 10.
-    </span>
+    </div>
   );
 }
 
@@ -63,9 +78,7 @@ export function BillingBanner({
   return (
     <div className={`space-y-1 rounded-2xl p-3 text-sm ring-1 ${tone}`}>
       <p className="font-semibold">{title}</p>
-      <p>
-        <PayInstructions groupName={groupName} />
-      </p>
+      <PayInstructions groupName={groupName} />
     </div>
   );
 }
