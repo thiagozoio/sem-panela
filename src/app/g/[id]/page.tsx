@@ -17,7 +17,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const { id } = await params;
   const supabase = await createClient();
   // O próximo jogo é garantido em paralelo com o carregamento do grupo.
-  const [{ group, members, me, isOrganizer, locked }, { data: gameId }] = await Promise.all([
+  const [{ group, members, me, isOrganizer, readOnly }, { data: gameId }] = await Promise.all([
     getGroupContext(id),
     supabase.rpc("ensure_next_game", { p_group_id: id }),
   ]);
@@ -30,7 +30,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const { attendances, ...game } = gameRow;
   const sport = sportOf(group.sport);
   const [{ count: fixedTeams }, { data: lastGame }] = await Promise.all([
-    isOrganizer && !locked
+    isOrganizer && !readOnly
       ? supabase
           .from("fixed_teams")
           .select("id", { count: "exact", head: true })
@@ -96,14 +96,14 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
               <form action={setAttendance}>
                 {hidden(me.id)}
                 <input type="hidden" name="going" value="1" />
-                <SubmitButton className="w-full" disabled={myIndex >= 0 || myWait >= 0} pendingText="…">
+                <SubmitButton className="w-full" disabled={readOnly || myIndex >= 0 || myWait >= 0} pendingText="…">
                   Vou ✅
                 </SubmitButton>
               </form>
               <form action={setAttendance}>
                 {hidden(me.id)}
                 <input type="hidden" name="going" value="0" />
-                <SubmitButton variant="secondary" className="w-full" disabled={myOut} pendingText="…">
+                <SubmitButton variant="secondary" className="w-full" disabled={readOnly || myOut} pendingText="…">
                   Não vou
                 </SubmitButton>
               </form>
@@ -146,7 +146,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         />
       </Card>
 
-      {isOrganizer && (
+      {isOrganizer && !readOnly && (
         <Card>
           <details>
             <summary className="cursor-pointer font-semibold">Marcar presença de outros jogadores</summary>
@@ -206,7 +206,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
           </p>
         )}
 
-        {isOrganizer && (
+        {isOrganizer && !readOnly && (
           <form action={drawTeamsAction} className="flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3">
             <input type="hidden" name="group_id" value={group.id} />
             <input type="hidden" name="game_id" value={game.id} />

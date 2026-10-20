@@ -59,10 +59,10 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
 
 export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogadores">) {
   const { id } = await params;
-  const { group, members, me, isOrganizer } = await getGroupContext(id);
+  const { group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
   const active = members.filter((m) => m.active);
   const inactive = members.filter((m) => !m.active);
-  const canEdit = isOrganizer;
+  const canEdit = isOrganizer && !readOnly;
   const sport = sportOf(group.sport);
 
   return (
