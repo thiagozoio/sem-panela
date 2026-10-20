@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addMonths, parseMoney, todayInBrazil } from "../format";
-import { subscriptionState } from "../subscription";
+import { isTrial, subscriptionState } from "../subscription";
 
 describe("format", () => {
   it("addMonths segura fim de mês", () => {
@@ -24,6 +24,10 @@ describe("subscriptionState", () => {
     expect(subscriptionState("2026-10-16", "2026-10-14").status).toBe("due_soon");
     expect(subscriptionState("2026-10-10", "2026-10-14").status).toBe("grace");
     expect(subscriptionState("2026-10-07", "2026-10-14").status).toBe("grace");
-    expect(subscriptionState("2026-10-06", "2026-10-14").status).toBe("read_only");
+    expect(subscriptionState("2026-10-06", "2026-10-14").status).toBe("free");
+  });
+  it("teste grátis até o admin estender o pago até", () => {
+    expect(isTrial("2026-10-14T23:30:00Z", "2026-11-13")).toBe(true);
+    expect(isTrial("2026-10-14T23:30:00Z", "2026-12-13")).toBe(false);
   });
 });

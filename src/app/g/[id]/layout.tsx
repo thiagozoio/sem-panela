@@ -7,7 +7,7 @@ import { rankingOf } from "@/lib/standings";
 
 export default async function GroupLayout({ children, params }: LayoutProps<"/g/[id]">) {
   const { id } = await params;
-  const { group, user, isOrganizer, subscription } = await getGroupContext(id);
+  const { group, user, isOrganizer, subscription, trial } = await getGroupContext(id);
 
   return (
     <AppShell admin={user.isAdmin}>
@@ -18,7 +18,14 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
           {group.location && ` · ${group.location}`}
         </p>
       </div>
-      <BillingBanner state={subscription} paidUntil={group.paid_until} organizer={isOrganizer} groupName={group.name} />
+      <BillingBanner
+        state={subscription}
+        paidUntil={group.paid_until}
+        trial={trial}
+        organizer={isOrganizer}
+        groupId={group.id}
+        groupName={group.name}
+      />
       <GroupTabs
         groupId={group.id}
         organizer={isOrganizer}

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "./auth";
 import { createClient } from "./supabase/server";
-import { subscriptionState } from "./subscription";
+import { isTrial, subscriptionState } from "./subscription";
 import { todayInBrazil } from "./format";
 import type { Group, Member } from "./types";
 
@@ -34,6 +34,8 @@ export const getGroupContext = cache(async (groupId: string) => {
     me: me ? members.find((m) => m.id === me.id)! : null,
     isOrganizer: !!me?.is_organizer,
     subscription,
-    readOnly: subscription.status === "read_only",
+    trial: isTrial(group.created_at, group.paid_until),
+    /** Plano grátis: lista e sorteio liberados; o resto fica bloqueado até assinar. */
+    locked: subscription.status === "free",
   };
 });

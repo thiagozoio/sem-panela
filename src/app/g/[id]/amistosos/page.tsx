@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge, Button, Card, Input, LinkButton } from "@/components/ui";
+import { UpgradeCard } from "@/components/billing-banner";
 import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
@@ -32,8 +33,8 @@ function matchMessage(groupName: string, m: Match) {
 export default async function MatchesPage({ params, searchParams }: PageProps<"/g/[id]/amistosos">) {
   const { id } = await params;
   const { adversario } = await searchParams;
-  const { supabase, group, isOrganizer, readOnly } = await getGroupContext(id);
-  const canEdit = isOrganizer && !readOnly;
+  const { supabase, group, isOrganizer, locked } = await getGroupContext(id);
+  const canEdit = isOrganizer && !locked;
   const base = `/g/${group.id}/amistosos`;
 
   if (!group.matches) {
@@ -59,6 +60,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="space-y-4">
+      {locked && <UpgradeCard feature="Amistosos" organizer={isOrganizer} groupName={group.name} />}
       <Card className="space-y-3">
         <h2 className="font-semibold">Próximos jogos</h2>
         {upcoming.length === 0 ? (
