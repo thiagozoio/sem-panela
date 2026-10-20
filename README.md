@@ -44,6 +44,12 @@ npm run lint
 
 1. Crie um projeto na região **South America (São Paulo)**.
 2. No **SQL Editor**, rode os arquivos de `supabase/migrations/` em ordem de data (ou `supabase db push` com a CLI).
+
+   > Desde 30/10/2026 o Supabase não dá mais acesso automático da API a tabelas novas em `public`. Toda migration que cria tabela precisa trazer, logo depois do `create table`, o grant explícito (e só então os `revoke`/`grant update (...)` de colunas):
+   >
+   > ```sql
+   > grant select, insert, update, delete on public.nova_tabela to authenticated, service_role;
+   > ```
 3. **Authentication > URL Configuration**: `Site URL` = URL do app (ex.: `https://sempanela.vercel.app`) e adicione `https://sempanela.vercel.app/**` e `http://localhost:3000/**` em *Redirect URLs*.
 4. **Authentication > Email Templates**, nos modelos *Magic Link* e *Confirm signup*, troque o corpo por algo assim (o link funciona até aberto em outro navegador, e o código serve para quem está no app instalado):
 

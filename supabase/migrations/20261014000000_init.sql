@@ -11,6 +11,7 @@ create table public.profiles (
   is_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
+grant select, insert, update, delete on public.profiles to authenticated, service_role;
 
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
@@ -32,6 +33,7 @@ create table public.groups (
   paid_until date not null default (current_date + 30),
   created_at timestamptz not null default now()
 );
+grant select, insert, update, delete on public.groups to authenticated, service_role;
 
 create table public.members (
   id uuid primary key default gen_random_uuid(),
@@ -45,6 +47,7 @@ create table public.members (
   created_at timestamptz not null default now(),
   unique (group_id, user_id)
 );
+grant select, insert, update, delete on public.members to authenticated, service_role;
 create index members_user_idx on public.members (user_id);
 
 -- Nível do jogador fica numa tabela à parte: só o organizador lê e escreve.
@@ -53,6 +56,7 @@ create table public.member_skills (
   group_id uuid not null references public.groups (id) on delete cascade,
   skill smallint not null default 3 check (skill between 1 and 5)
 );
+grant select, insert, update, delete on public.member_skills to authenticated, service_role;
 
 create table public.games (
   id uuid primary key default gen_random_uuid(),
@@ -62,6 +66,7 @@ create table public.games (
   created_at timestamptz not null default now(),
   unique (group_id, starts_at)
 );
+grant select, insert, update, delete on public.games to authenticated, service_role;
 
 create table public.attendances (
   game_id uuid not null references public.games (id) on delete cascade,
@@ -70,6 +75,7 @@ create table public.attendances (
   confirmed_at timestamptz not null default now(),
   primary key (game_id, member_id)
 );
+grant select, insert, update, delete on public.attendances to authenticated, service_role;
 
 create table public.payments (
   id uuid primary key default gen_random_uuid(),
@@ -87,6 +93,7 @@ create table public.payments (
   unique (member_id, month),
   unique (member_id, game_id)
 );
+grant select, insert, update, delete on public.payments to authenticated, service_role;
 create index payments_group_idx on public.payments (group_id);
 
 -- ---------------------------------------------------------------------------
