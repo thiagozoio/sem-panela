@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Input, Select } from "@/components/ui";
+import { UpgradeCard } from "@/components/billing-banner";
 import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
@@ -17,7 +18,7 @@ const NOTES = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
 export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogos/[gameId]">) {
   const { id, gameId } = await params;
-  const { supabase, group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
+  const { supabase, group, members, me, isOrganizer, locked } = await getGroupContext(id);
 
   const [{ data: gameRow }, { data: goals }, { data: summary }, { data: myRatings }] = await Promise.all([
     supabase
@@ -51,13 +52,15 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const best = bestPlayer(ranking);
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0;
-  const canEditResult = isOrganizer && !readOnly;
+  const canEditResult = isOrganizer && !locked;
 
   return (
     <div className="space-y-4">
       <Link href={`/g/${group.id}/jogos`} className="text-sm text-pitch-700">
         ‹ Jogos anteriores
       </Link>
+
+      {locked && <UpgradeCard feature="Placar, gols e notas" organizer={isOrganizer} groupName={group.name} />}
 
       <Card className="space-y-3">
         <div>
@@ -175,7 +178,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         <p className="text-xs text-neutral-500">Cada um vê só a média. Ninguém sabe quem deu qual nota.</p>
       </Card>
 
-      {me && iPlayed && started && !readOnly && (
+      {me && iPlayed && started && !locked && (
         <Card>
           <details open={myRating.size === 0}>
             <summary className="cursor-pointer font-semibold">{myRating.size ? "Mudar minhas notas" : "Dar notas para quem jogou"}</summary>
