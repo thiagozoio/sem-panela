@@ -3,7 +3,7 @@ import { splitList } from "../attendance";
 import type { Attendance, Member } from "../types";
 
 const member = (id: string, kind: Member["kind"]): Member => ({
-  id, group_id: "g", user_id: null, name: id, position: "linha", skill: 3, kind,
+  id, group_id: "g", user_id: null, name: id, position: "linha", skill: 3, phone: "", kind,
   is_organizer: false, active: true, created_at: "",
 });
 

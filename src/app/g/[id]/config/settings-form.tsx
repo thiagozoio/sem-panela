@@ -40,6 +40,15 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
             ))}
           </Select>
         </Field>
+        <Field
+          label="Jogos contra outros times"
+          hint="Liga a aba Amistosos: agenda dos jogos contra outras equipes, com o contato do adversário, e o histórico de resultados."
+        >
+          <Select name="matches" defaultValue={group.matches ? "1" : "0"}>
+            <option value="0">Não, só a pelada entre nós</option>
+            <option value="1">Sim, também jogamos contra outros times</option>
+          </Select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Dia">
             <Select name="weekday" defaultValue={group.weekday}>

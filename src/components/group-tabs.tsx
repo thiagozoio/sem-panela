@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function GroupTabs({ groupId, organizer, ranking }: { groupId: string; organizer: boolean; ranking: boolean }) {
+export function GroupTabs({
+  groupId,
+  organizer,
+  ranking,
+  matches,
+}: {
+  groupId: string;
+  organizer: boolean;
+  ranking: boolean;
+  matches: boolean;
+}) {
   const pathname = usePathname();
   const base = `/g/${groupId}`;
   const tabs = [
@@ -11,6 +21,7 @@ export function GroupTabs({ groupId, organizer, ranking }: { groupId: string; or
     { href: `${base}/jogadores`, label: "Jogadores" },
     { href: `${base}/times`, label: "Times" },
     ...(ranking ? [{ href: `${base}/classificacao`, label: "Tabela" }] : []),
+    ...(matches ? [{ href: `${base}/amistosos`, label: "Amistosos" }] : []),
     ...(organizer
       ? [
           { href: `${base}/financeiro`, label: "Financeiro" },
