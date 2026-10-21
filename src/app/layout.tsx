@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { themeScript } from "@/lib/theme";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         {children}
         <RefreshOnReturn />
+        <Analytics />
       </body>
     </html>
   );
