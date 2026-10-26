@@ -16,7 +16,19 @@ type Usage = {
   groups_total: number; groups_active_30d: number; members_total: number;
   members_with_account: number; games_total: number; attendances_30d: number;
 };
-type Activity = { group_id: string; games_count: number; last_game: string | null };
+type Activity = { group_id: string; games_count: number; last_game: string | null } & Partial<Recent>;
+// Campos da migration 20261026 (últimos 30 dias); sem ela, o card de atividade não aparece.
+type Recent = {
+  from_admin: boolean; games_30d: number; attendances_30d: number; players_confirming_30d: number;
+  draws_30d: number; results_30d: number; payments_30d: number; ratings_30d: number;
+};
+const recentKeys = ["games_30d", "attendances_30d", "draws_30d", "results_30d", "payments_30d", "ratings_30d"] as const;
+
+function sumRecent(rows: Activity[]) {
+  const total = Object.fromEntries(recentKeys.map((k) => [k, 0])) as Record<(typeof recentKeys)[number], number>;
+  for (const r of rows) for (const k of recentKeys) total[k] += Number(r[k] ?? 0);
+  return total;
+}
 
 async function setPaidUntil(fd: FormData) {
   "use server";
@@ -48,7 +60,10 @@ export default async function AdminPage() {
   ]);
   const groups = (data ?? []) as AdminGroup[];
   const usage = (usageRows as Usage[] | null)?.[0];
-  const activity = new Map(((activityRows ?? []) as Activity[]).map((a) => [a.group_id, a]));
+  const activityList = (activityRows ?? []) as Activity[];
+  const activity = new Map(activityList.map((a) => [a.group_id, a]));
+  const hasRecent = activityList.some((a) => a.games_30d !== undefined);
+  const recent = sumRecent(activityList.filter((a) => !a.from_admin));
   const today = todayInBrazil();
   const paying = groups.filter((g) => subscriptionState(g.paid_until, today).status !== "read_only").length;
 
@@ -71,6 +86,22 @@ export default async function AdminPage() {
           </dl>
         </Card>
       )}
+      {hasRecent && (
+        <Card className="space-y-3">
+          <div>
+            <p className="font-semibold">O que fizeram nos últimos 30 dias</p>
+            <p className="text-sm text-neutral-600">Somando os grupos de clientes. O detalhe de cada grupo está no card dele.</p>
+          </div>
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Stat label="Peladas" value={recent.games_30d} />
+            <Stat label="Presenças confirmadas" value={recent.attendances_30d} />
+            <Stat label="Times sorteados" value={recent.draws_30d} />
+            <Stat label="Placares lançados" value={recent.results_30d} />
+            <Stat label="Pagamentos marcados" value={recent.payments_30d} />
+            <Stat label="Notas dadas" value={recent.ratings_30d} />
+          </dl>
+        </Card>
+      )}
       {groups.map((g) => {
         const state = subscriptionState(g.paid_until, today);
         const act = activity.get(g.id);
@@ -87,6 +118,13 @@ export default async function AdminPage() {
                     {act?.last_game
                       ? `${act.games_count} peladas · última em ${formatDay(todayInBrazil(new Date(act.last_game)))}`
                       : "nenhuma pelada ainda"}
+                  </p>
+                )}
+                {act?.games_30d !== undefined && (
+                  <p className="text-sm text-neutral-600">
+                    30 dias: {act.attendances_30d} presenças ({act.players_confirming_30d} jogadores) ·{" "}
+                    {act.draws_30d}/{act.games_30d} sorteios · {act.results_30d} placares ·{" "}
+                    {act.payments_30d} pagamentos · {act.ratings_30d} notas
                   </p>
                 )}
                 <p className="text-sm">Pago até <strong>{formatDay(g.paid_until)}</strong></p>
