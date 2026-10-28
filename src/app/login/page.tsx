@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui";
@@ -41,6 +42,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       </Card>
       <p className="text-center text-sm text-neutral-600">
         É jogador e não quer usar e-mail? Peça ao organizador o seu <strong>link de acesso</strong> pelo WhatsApp.
+      </p>
+      <p className="text-center text-xs text-neutral-500">
+        <Link href="/privacidade" className="underline">Política de privacidade</Link>
       </p>
     </main>
   );

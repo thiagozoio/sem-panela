@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LinkButton } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
@@ -41,6 +42,9 @@ export default async function Home() {
         ))}
         <p className="pt-4 text-center text-sm text-neutral-600">
           30 dias grátis. Depois, <strong>{formatMoney(PRICE_CENTS)} por mês</strong> por grupo, com jogadores ilimitados. Só o organizador paga.
+        </p>
+        <p className="text-center text-xs text-neutral-500">
+          <Link href="/privacidade" className="underline">Política de privacidade</Link>
         </p>
       </section>
     </main>
