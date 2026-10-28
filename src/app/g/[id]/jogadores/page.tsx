@@ -6,6 +6,7 @@ import { positionInfo, positionOf, positionOptions, sportOf, type Sport } from "
 import { formatPhone, whatsappTo } from "@/lib/matches";
 import type { Member } from "@/lib/types";
 import { addMember, setMemberActive, updateMember } from "../actions";
+import { AccessLinkButton } from "./access-link-button";
 import { OrganizerButton } from "./organizer-button";
 
 export const metadata: Metadata = { title: "Jogadores" };
@@ -95,11 +96,16 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
                       )}
                     </div>
                   </form>
+                  {!m.is_organizer && (
+                    <div className="mt-2 rounded-xl bg-neutral-50 p-3">
+                      <AccessLinkButton memberId={m.id} memberName={m.name} groupName={group.name} phone={m.phone} />
+                    </div>
+                  )}
                   <div className="mt-2 rounded-xl bg-neutral-50 p-3">
                     {m.user_id ? (
                       <OrganizerButton memberId={m.id} isOrganizer={m.is_organizer} isMe={m.id === me?.id} />
                     ) : (
-                      <p className="text-xs text-neutral-500">Para virar organizador, a pessoa precisa entrar pelo link de convite.</p>
+                      <p className="text-xs text-neutral-500">Para virar organizador, a pessoa precisa entrar primeiro (pelo convite ou pelo acesso acima).</p>
                     )}
                   </div>
                 </details>
@@ -122,7 +128,7 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
           <details>
             <summary className="cursor-pointer font-semibold">+ Cadastrar jogador</summary>
             <p className="mt-2 text-sm text-neutral-600">
-              Para quem ainda não entrou pelo link. Quando a pessoa entrar pelo convite, ela escolhe o próprio nome e assume o cadastro.
+              Para quem ainda não entrou pelo link. Depois é só abrir o jogador e tocar em “Enviar acesso pelo WhatsApp”: ele entra sem e-mail. Quem preferir pode entrar pelo convite e escolher o próprio nome.
             </p>
             <form action={addMember} className="mt-3 space-y-3">
               <input type="hidden" name="group_id" value={group.id} />

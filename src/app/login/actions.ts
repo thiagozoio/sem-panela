@@ -33,6 +33,18 @@ export async function verifyCode(prev: LoginState, formData: FormData): Promise<
   redirect(safeNext(prev.next));
 }
 
+/** Entrar com Google (só aparece com NEXT_PUBLIC_GOOGLE_LOGIN=1). Volta pelo /auth/confirm. */
+export async function signInWithGoogle(formData: FormData) {
+  const next = safeNext(formData.get("next"));
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${await siteUrl()}/auth/confirm?next=${encodeURIComponent(next)}` },
+  });
+  if (error || !data.url) redirect(`/login?erro=1&next=${encodeURIComponent(next)}`);
+  redirect(data.url);
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
