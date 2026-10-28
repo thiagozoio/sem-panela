@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 import { getGroupContext } from "@/lib/groups";
 import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
@@ -10,6 +11,7 @@ import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
 import { rankingOf } from "@/lib/standings";
+import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -39,30 +41,70 @@ export async function setAttendance(fd: FormData) {
   // Sem carregar o grupo inteiro: a RLS garante que só o próprio jogador ou o organizador mudam.
   const supabase = await createClient();
 
-  const { data: current } = await supabase
-    .from("attendances")
-    .select("going")
-    .eq("game_id", gameId)
-    .eq("member_id", memberId)
-    .maybeSingle();
+  const before = await gameAttendances(supabase, gameId);
+  const current = before.find((a) => a.member_id === memberId);
 
   if (!current) {
     await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going });
   } else if (current.going !== going) {
     // Voltar a confirmar vai para o fim da fila.
-    await supabase
+    const { error } = await supabase
       .from("attendances")
       .update({ going, confirmed_at: new Date().toISOString() })
       .eq("game_id", gameId)
       .eq("member_id", memberId);
+    // Desistiu: o primeiro da lista de espera sobe e recebe o aviso.
+    if (!error && current.going) after(() => notifyPromotions(groupId, gameId, before));
   }
   refresh();
 }
 
 export async function clearAttendance(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const memberId = str(fd, "member_id");
   const supabase = await createClient();
-  await supabase.from("attendances").delete().eq("game_id", str(fd, "game_id")).eq("member_id", str(fd, "member_id"));
+  const before = await gameAttendances(supabase, gameId);
+  const { error } = await supabase.from("attendances").delete().eq("game_id", gameId).eq("member_id", memberId);
+  if (!error && groupId && before.some((a) => a.member_id === memberId && a.going)) {
+    after(() => notifyPromotions(groupId, gameId, before));
+  }
   refresh();
+}
+
+async function gameAttendances(supabase: Client, gameId: string) {
+  const { data } = await supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>();
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Avisos no celular (organizador)
+// ---------------------------------------------------------------------------
+
+export type PushState = { message?: string; error?: string };
+
+async function organizerOf(groupId: string) {
+  const ctx = await getGroupContext(groupId);
+  return ctx.isOrganizer && !ctx.readOnly ? ctx : null;
+}
+
+/** Lembra quem ainda não respondeu se vai ao jogo. */
+export async function pushPending(_prev: PushState, fd: FormData): Promise<PushState> {
+  const groupId = str(fd, "group_id");
+  if (!(await organizerOf(groupId))) return { error: "Só o organizador pode mandar avisos." };
+  const sent = await notifyPending(groupId, str(fd, "game_id"));
+  return sent ? { message: `Aviso enviado para ${sent} celular${sent > 1 ? "es" : ""}.` } : { error: "Ninguém pendente está com os avisos ativados." };
+}
+
+/** Recado livre para todos os jogadores (ex.: "jogo cancelado por causa da chuva"). */
+export async function pushMessage(_prev: PushState, fd: FormData): Promise<PushState> {
+  const groupId = str(fd, "group_id");
+  const text = str(fd, "text").slice(0, 200);
+  if (!text) return { error: "Escreva o recado." };
+  const ctx = await organizerOf(groupId);
+  if (!ctx) return { error: "Só o organizador pode mandar avisos." };
+  const sent = await notifyGroup(groupId, text, ctx.user.id);
+  return sent ? { message: `Recado enviado para ${sent} celular${sent > 1 ? "es" : ""}.` } : { error: "Nenhum jogador está com os avisos ativados ainda." };
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +129,7 @@ async function confirmedForGame(groupId: string, gameId: string) {
   if (!game) return null;
   const { confirmed } = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const sport = sportOf(group.sport);
-  return { supabase, game, players: confirmed.map(({ member }) => toDrawPlayer(sport, member)) };
+  return { supabase, game, userId: ctx.user.id, players: confirmed.map(({ member }) => toDrawPlayer(sport, member)) };
 }
 
 export async function drawTeamsAction(fd: FormData) {
@@ -95,7 +137,8 @@ export async function drawTeamsAction(fd: FormData) {
   const data = await confirmedForGame(str(fd, "group_id"), gameId);
   if (!data) return;
   const teams = drawTeams(data.players, clampInt(str(fd, "teams"), 2, 8, 2));
-  await data.supabase.from("games").update({ teams }).eq("id", gameId);
+  const { error } = await data.supabase.from("games").update({ teams }).eq("id", gameId);
+  if (!error) after(() => notifyTeamsDrawn(data.game.group_id, gameId, data.userId));
   refresh();
 }
 
@@ -113,7 +156,8 @@ export async function applyFixedTeams(fd: FormData) {
     .order("sort")
     .returns<FixedTeam[]>();
   if (!fixed?.length) return;
-  await data.supabase.from("games").update({ teams: teamsFromFixed(fixed, data.players) }).eq("id", gameId);
+  const { error } = await data.supabase.from("games").update({ teams: teamsFromFixed(fixed, data.players) }).eq("id", gameId);
+  if (!error) after(() => notifyTeamsDrawn(groupId, gameId, data.userId));
   refresh();
 }
 

@@ -16,6 +16,7 @@ App web (PWA) em **Next.js 16 + Supabase**, hospedado na **Vercel**.
 | `/g/[id]/financeiro` | Mensalidades e avulsos por mês, quem deve e mensagem de cobrança pronta |
 | `/g/[id]/config` | Ajustes, valores, chave Pix, link de convite e status da assinatura |
 | `/admin` | Para o dono do SaaS: lista de grupos e marcação manual do "pago até" |
+| `/perfil` | Nome e liga/desliga dos avisos no celular (com botão de teste) |
 
 ### Regras
 - **Próximo jogo**: criado automaticamente pelo dia/horário do grupo; continua aberto até 3h depois do início e então abre a lista da semana seguinte.
@@ -23,6 +24,22 @@ App web (PWA) em **Next.js 16 + Supabase**, hospedado na **Vercel**.
 - **Prioridade**: mensalista que confirma até `priority_hours` (padrão 24h) antes do jogo passa na frente dos avulsos.
 - **Sorteio** (`src/lib/draw.ts`): um goleiro por time, linha distribuída por nível e depois trocas que reduzem a diferença entre os times.
 - **Assinatura**: R$ 19,90/mês por grupo, Pix manual para o dono. O banco guarda `groups.paid_until`; 7 dias depois do vencimento o grupo fica **só leitura** (garantido pela RLS).
+
+### Avisos no celular (Web Push)
+Funciona no Android (Chrome) e no iPhone com o app instalado na tela de início (iOS 16.4+). O jogador ativa na tela da pelada ou no Perfil.
+
+| Aviso | Quando | Para quem |
+|---|---|---|
+| Pelada amanhã / hoje | rotina diária às 10h (`/api/cron/avisos`, `vercel.json`) | quem ainda não respondeu |
+| Times sorteados | quando o organizador sorteia ou usa os times fixos | cada jogador sorteado, com o nome do seu time |
+| Abriu vaga | quando alguém desiste ou é tirado da lista | quem sobe da lista de espera |
+| Mensalidade em aberto | dia 5, na rotina diária | mensalistas que não pagaram o mês |
+| Assinatura vencendo | 3 dias antes, no dia, 1 dia depois e no último dia antes do só leitura | organizadores |
+| Cobrar resposta / recado | botão "Avisar no celular" na tela do jogo | pendentes / todos |
+
+Os aparelhos ficam em `push_subscriptions`; o envio usa a chave secreta do Supabase (`src/lib/supabase/admin.ts`) só no servidor. Sem as variáveis de push no `.env`, tudo isso fica escondido.
+
+Para ligar: gere as chaves com `npx web-push generate-vapid-keys` e cadastre `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `SUPABASE_SECRET_KEY` e `CRON_SECRET` (veja `.env.example`).
 
 ## Rodando localmente
 
@@ -85,4 +102,4 @@ src/app/               telas (App Router) e server actions
 
 ## Próximos passos (fora do MVP)
 - Cobrança automática da assinatura pelo Asaas (o campo `paid_until` já é o ponto de integração: o webhook só precisa atualizá-lo).
-- Pix da turma com baixa automática, placar e artilharia, notificações.
+- Pix da turma com baixa automática.

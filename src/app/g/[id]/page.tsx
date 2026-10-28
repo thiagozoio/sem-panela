@@ -11,6 +11,9 @@ import { byPosition, positionInfo, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
+import { PushToggle } from "@/components/push-toggle";
+import { pushEnabled, VAPID_PUBLIC_KEY } from "@/lib/push";
+import { OrganizerPush } from "./organizer-push";
 import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, setAttendance } from "./actions";
 
 export default async function GamePage({ params }: PageProps<"/g/[id]">) {
@@ -54,6 +57,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const myWait = me ? list.waitlist.findIndex((e) => e.member.id === me.id) : -1;
   const myOut = me ? list.out.some((m) => m.id === me.id) : false;
   const origin = await siteUrl();
+  const push = pushEnabled();
 
   const drawnIds = new Set(game.teams?.flatMap((t) => t.players.map((p) => p.member_id)) ?? []);
   const listChanged =
@@ -111,6 +115,8 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
           </div>
         )}
       </Card>
+
+      {me && push && <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="prompt" />}
 
       {lastGame && (
         <Link
@@ -174,6 +180,8 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
           </details>
         </Card>
       )}
+
+      {isOrganizer && !readOnly && push && <OrganizerPush groupId={group.id} gameId={game.id} pending={pending.filter((m) => m.user_id).length} />}
 
       <Card className="space-y-3">
         <h2 className="font-semibold">Times</h2>
