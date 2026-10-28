@@ -4,9 +4,11 @@ import { refresh } from "next/cache";
 import { AppShell } from "@/components/app-shell";
 import { Card, Field, Input, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
+import { PushToggle } from "@/components/push-toggle";
 import { getCurrentUser, getSessionUser, safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isLinkEmail } from "@/lib/player-link";
+import { pushEnabled, VAPID_PUBLIC_KEY } from "@/lib/push";
 
 export const metadata: Metadata = { title: "Perfil" };
 
@@ -47,6 +49,12 @@ export default async function ProfilePage({ searchParams }: PageProps<"/perfil">
           <SubmitButton className="w-full">Salvar</SubmitButton>
         </form>
       </Card>
+      {user.name && pushEnabled() && (
+        <Card className="space-y-2">
+          <h2 className="font-semibold">Avisos no celular</h2>
+          <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="settings" />
+        </Card>
+      )}
     </AppShell>
   );
 }
