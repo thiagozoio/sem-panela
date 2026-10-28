@@ -1,7 +1,7 @@
 -- Sem Panela: notificações push no celular (Web Push).
 -- Cada aparelho que ativa os avisos vira uma linha aqui. O envio é feito pelo servidor do app
 -- com a chave secreta do Supabase; o usuário só vê e apaga as próprias inscrições.
--- Rode no SQL Editor depois de 20261026000000_admin_atividade.sql.
+-- Rode no SQL Editor depois de 20261026000000_admin_atividade.sql (independe de 20261028000000_link_jogador.sql).
 
 create table public.push_subscriptions (
   endpoint text primary key,
