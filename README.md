@@ -85,6 +85,16 @@ npm run lint
 
 O e-mail padrão do Supabase tem limite baixo de envios por hora; para produção configure um SMTP (ex.: Resend) em **Authentication > SMTP Settings**.
 
+## Login dos jogadores sem e-mail
+
+**Link pessoal (WhatsApp).** Em *Jogadores*, o organizador abre um jogador e toca em *Enviar acesso pelo WhatsApp*. O jogador toca no link, aperta *Entrar* e fica logado no celular, sem e-mail nem código. Regras:
+
+- Vale por 7 dias. Depois do primeiro uso ainda funciona por 1 hora (para abrir no navegador e depois no app instalado). Gerar outro invalida o anterior.
+- Só serve para jogador comum: nunca para organizador, dono de grupo, admin ou quem já entra com e-mail.
+- Precisa da variável `SUPABASE_SECRET_KEY` (Project Settings > API Keys > *Secret key*) no servidor. A conta criada usa um e-mail interno `<id>@jogador.sempanela.app.br` que não recebe mensagens.
+
+**Entrar com Google.** Crie um *OAuth Client ID* (tipo *Web application*) no Google Cloud Console com a URI de redirecionamento `https://<projeto>.supabase.co/auth/v1/callback`, cole o Client ID e o Secret em **Authentication > Providers > Google** no Supabase e ponha `NEXT_PUBLIC_GOOGLE_LOGIN=1` na Vercel.
+
 ## Deploy na Vercel
 
 1. Importe o repositório na Vercel (região `gru1`, São Paulo, em *Settings > Functions*).

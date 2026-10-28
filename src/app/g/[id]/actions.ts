@@ -11,6 +11,7 @@ import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
 import { rankingOf } from "@/lib/standings";
+import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
 
@@ -281,6 +282,19 @@ export async function setOrganizer(_prev: OrganizerState, fd: FormData): Promise
   }
   refresh();
   return {};
+}
+
+export type AccessLinkState = { url?: string; error?: string };
+
+/** Gera o link pessoal de acesso do jogador (o anterior deixa de valer). */
+export async function createAccessLink(_prev: AccessLinkState, fd: FormData): Promise<AccessLinkState> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_member_link", { p_member_id: str(fd, "member_id") });
+  if (error || typeof data !== "string") {
+    if (error?.message.includes("e-mail")) return { error: "Essa pessoa já entra com e-mail. Ela continua entrando do mesmo jeito." };
+    return { error: "Não deu para gerar o link. Se a assinatura venceu, o grupo está só leitura." };
+  }
+  return { url: `${await siteUrl()}/entrar/${data}` };
 }
 
 // ---------------------------------------------------------------------------
