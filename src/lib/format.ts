@@ -68,6 +68,11 @@ export function addMonths(day: string, months: number): string {
   return target.toISOString().slice(0, 10);
 }
 
+/** Se o mês (AAAA-MM-01) já entra na cobrança: sem mês de início, cobra sempre. */
+export function isBillingMonth(billingStart: string | null | undefined, month: string): boolean {
+  return !billingStart || month >= billingStart.slice(0, 10);
+}
+
 export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
 }

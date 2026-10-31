@@ -3,13 +3,22 @@
 import { useActionState } from "react";
 import { ErrorText, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
-import { WEEKDAYS } from "@/lib/format";
+import { WEEKDAYS, addMonths, monthLabel, monthStart, todayInBrazil } from "@/lib/format";
 import { SPORTS, sportOf } from "@/lib/sports";
 import { RANKING_MODES, rankingOf } from "@/lib/standings";
 import type { Group } from "@/lib/types";
 import { saveSettings } from "../actions";
 
 const money = (cents: number) => (cents ? (cents / 100).toFixed(2).replace(".", ",") : "");
+
+/** Seis meses para trás e seis para frente, mais o que já estiver salvo. */
+function billingMonths(saved: string | null | undefined) {
+  const current = monthStart(todayInBrazil());
+  const months = Array.from({ length: 13 }, (_, i) => addMonths(current, i - 6));
+  const value = saved?.slice(0, 10);
+  if (value && !months.includes(value)) months.push(value);
+  return months.sort();
+}
 
 export function SettingsForm({ group, disabled }: { group: Group; disabled: boolean }) {
   const [state, action] = useActionState(saveSettings, {});
@@ -84,6 +93,17 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
             <Input name="single_fee" inputMode="decimal" placeholder="25,00" defaultValue={money(group.single_fee_cents)} />
           </Field>
         </div>
+        <Field
+          label="Cobrança pelo app começa em"
+          hint="Os meses antes deste não aparecem como em aberto no Financeiro. Bom para quem começou a usar no meio do mês."
+        >
+          <Select name="billing_start" defaultValue={group.billing_start?.slice(0, 10) ?? ""}>
+            <option value="">Desde o começo</option>
+            {billingMonths(group.billing_start).map((m) => (
+              <option key={m} value={m}>{monthLabel(m)}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Sua chave Pix" hint="Vai na mensagem de cobrança da turma.">
           <Input name="pix_key" defaultValue={group.pix_key} maxLength={140} />
         </Field>

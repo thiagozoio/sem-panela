@@ -418,6 +418,12 @@ export async function saveChampionship(_prev: ChampionshipState, fd: FormData): 
     ? await supabase.from("championships").update({ name, starts_on, ends_on }).eq("id", id).eq("group_id", groupId)
     : await supabase.from("championships").insert({ group_id: groupId, name, starts_on, ends_on });
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
+  const billingStart = str(fd, "billing_start");
+  if (fd.has("billing_start") && (!billingStart || isMonth(billingStart))) {
+    // À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo.
+    const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
+    if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
+  }
   refresh();
   return { ok: true };
 }
@@ -455,6 +461,12 @@ export async function saveMatch(_prev: MatchState, fd: FormData): Promise<MatchS
     ? await supabase.from("matches").update(fields).eq("id", id).eq("group_id", groupId)
     : await supabase.from("matches").insert({ group_id: groupId, ...fields });
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
+  const billingStart = str(fd, "billing_start");
+  if (fd.has("billing_start") && (!billingStart || isMonth(billingStart))) {
+    // À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo.
+    const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
+    if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
+  }
   refresh();
   return { ok: true };
 }
@@ -516,9 +528,20 @@ export async function togglePayment(fd: FormData) {
 /** Saldo do caixa antes de começar a usar o app; aceita negativo ("-50"). */
 export async function setCashStart(fd: FormData) {
   const typed = str(fd, "cash_start");
-  const cents = parseMoney(typed) * (typed.startsWith("-") ? -1 : 1);
+  // O teclado numérico do iPhone não tem o sinal de menos: a escolha "estava devendo" faz o papel dele.
+  const negative = typed.startsWith("-") || str(fd, "cash_sign") === "-";
+  const cents = parseMoney(typed) * (negative ? -1 : 1);
   const supabase = await createClient();
   await supabase.from("groups").update({ cash_start_cents: cents }).eq("id", str(fd, "group_id"));
+  refresh();
+}
+
+/** Mês em que a cobrança começa (AAAA-MM-01), ou vazio para cobrar desde sempre. */
+export async function setBillingStart(fd: FormData) {
+  const month = str(fd, "billing_start");
+  if (month && !isMonth(month)) return;
+  const supabase = await createClient();
+  await supabase.from("groups").update({ billing_start: month || null }).eq("id", str(fd, "group_id"));
   refresh();
 }
 
@@ -590,6 +613,12 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
   if (error) ({ error } = await supabase.from("groups").update({ ...fields, sport }).eq("id", groupId));
   if (error) ({ error } = await supabase.from("groups").update(fields).eq("id", groupId));
   if (error) return { error: "Não deu para salvar. Se a assinatura venceu, o grupo está só leitura." };
+  const billingStart = str(fd, "billing_start");
+  if (fd.has("billing_start") && (!billingStart || isMonth(billingStart))) {
+    // À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo.
+    const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
+    if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
+  }
   refresh();
   return { ok: true };
 }

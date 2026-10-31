@@ -1,5 +1,5 @@
 import { splitList } from "@/lib/attendance";
-import { monthLabel, monthStart, todayInBrazil } from "@/lib/format";
+import { isBillingMonth, monthLabel, monthStart, todayInBrazil } from "@/lib/format";
 import {
   gamesToRemind,
   MONTHLY_FEE_REMINDER_DAY,
@@ -70,6 +70,7 @@ async function gameReminders(admin: AdminClient, group: Group, members: Member[]
 
 async function monthlyFeeReminder(admin: AdminClient, group: Group, members: Member[], today: string) {
   const month = monthStart(today);
+  if (!isBillingMonth(group.billing_start, month)) return 0;
   const { data: paid } = await admin.from("payments").select("member_id").eq("group_id", group.id).eq("kind", "mensal").eq("month", month);
   const paidIds = new Set((paid ?? []).map((p) => p.member_id));
   const userIds = members
