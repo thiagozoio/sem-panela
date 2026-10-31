@@ -7,10 +7,10 @@ import { SubmitButton } from "@/components/submit";
 import { ShareButtons } from "@/components/share";
 import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
-import { addMonths, formatGameDate, formatMoney, monthLabel, monthParam } from "@/lib/format";
+import { addMonths, formatGameDate, formatMoney, isBillingMonth, monthLabel, monthParam, monthStart, todayInBrazil } from "@/lib/format";
 import { debtorsMessage } from "@/lib/messages";
 import type { Attendance, Expense, Game, Member, Payment } from "@/lib/types";
-import { addExpense, copyExpenses, deleteExpense, setCashStart, togglePayment } from "../actions";
+import { addExpense, copyExpenses, deleteExpense, setBillingStart, setCashStart, togglePayment } from "../actions";
 
 export const metadata: Metadata = { title: "Financeiro" };
 
@@ -59,9 +59,12 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
     (payments ?? []).reduce((n, p) => n + p.amount_cents, 0) -
     (expenseRows ?? []).reduce((n, e) => n + e.amount_cents, 0);
   const spent = expenses.reduce((n, e) => n + e.amount_cents, 0);
+  // Antes do mês de início da cobrança ninguém deve nada (só o caixa e os gastos contam).
+  const charging = isBillingMonth(group.billing_start, month);
+  const currentMonth = monthStart(todayInBrazil());
 
   const monthly: Row[] = members
-    .filter((m) => m.active && m.kind === "mensalista")
+    .filter((m) => charging && m.active && !m.exempt && m.kind === "mensalista")
     .map((m) => ({
       member: m,
       kind: "mensal",
@@ -69,7 +72,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       payment: payments?.find((p) => p.member_id === m.id && p.kind === "mensal" && p.month === month),
     }));
 
-  const perGame = (games ?? []).map((game) => {
+  const perGame = (charging ? (games ?? []) : []).map((game) => {
     const { confirmed } = splitList(
       (attendances ?? []).filter((a) => a.game_id === game.id),
       members,
@@ -78,7 +81,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       group.priority_hours,
     );
     const rows: Row[] = confirmed
-      .filter((e) => e.member.kind === "avulso")
+      .filter((e) => e.member.kind === "avulso" && !e.member.exempt)
       .map((e) => ({
         member: e.member,
         kind: "avulso",
@@ -94,6 +97,8 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
   const open = all.filter((r) => !r.payment);
   const openTotal = open.reduce((n, r) => n + r.amountCents, 0);
   const name = monthLabel(month);
+  // Atalho para quem começou a usar no meio do mês: nada recebido ainda, cobrança só no mês seguinte.
+  const offerLaterStart = !readOnly && charging && month <= currentMonth && received === 0 && open.length > 0;
   const debtors = open.map((r) => ({
     name: r.member.name,
     amountCents: r.amountCents,
@@ -185,18 +190,41 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         {!readOnly && (
           <details>
             <summary className="w-fit cursor-pointer list-none text-xs text-pitch-700">Mudar saldo inicial</summary>
-            <form action={setCashStart} className="mt-2 flex gap-2">
+            <form action={setCashStart} className="mt-2 space-y-2">
               <input type="hidden" name="group_id" value={group.id} />
-              <Input
-                name="cash_start"
-                inputMode="decimal"
-                defaultValue={group.cash_start_cents ? (group.cash_start_cents / 100).toFixed(2).replace(".", ",") : ""}
-                placeholder="Quanto tinha no caixa"
-                aria-label="Saldo inicial do caixa"
-              />
-              <SubmitButton pendingText="…">Salvar</SubmitButton>
+              {/* O teclado numérico do iPhone não tem o sinal de menos, então a dívida é uma escolha à parte. */}
+              <div className="grid grid-cols-2 gap-2 text-sm" role="radiogroup" aria-label="Situação do caixa">
+                {[
+                  { value: "+", label: "Tinha dinheiro" },
+                  { value: "-", label: "Estava devendo" },
+                ].map((o) => (
+                  <label
+                    key={o.value}
+                    className="flex cursor-pointer items-center justify-center rounded-xl px-3 py-2 font-medium ring-1 ring-black/10 has-checked:bg-pitch-700 has-checked:text-white"
+                  >
+                    <input
+                      type="radio"
+                      name="cash_sign"
+                      value={o.value}
+                      defaultChecked={(group.cash_start_cents < 0) === (o.value === "-")}
+                      className="sr-only"
+                    />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  name="cash_start"
+                  inputMode="decimal"
+                  defaultValue={group.cash_start_cents ? (Math.abs(group.cash_start_cents) / 100).toFixed(2).replace(".", ",") : ""}
+                  placeholder="Valor (R$)"
+                  aria-label="Saldo inicial do caixa"
+                />
+                <SubmitButton pendingText="…">Salvar</SubmitButton>
+              </div>
             </form>
-            <p className="mt-1 text-xs text-neutral-500">O dinheiro que já estava no caixa antes de usar o app. Se estava devendo, use o sinal de menos.</p>
+            <p className="mt-1 text-xs text-neutral-500">O dinheiro que já estava no caixa antes de usar o app. Se a pelada estava devendo, escolha &quot;Estava devendo&quot;.</p>
           </details>
         )}
       </Card>
@@ -221,6 +249,40 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
           <p className="text-lg font-bold text-red-700">{formatMoney(openTotal)}</p>
         </Card>
       </div>
+
+      {!charging && group.billing_start && (
+        <Card className="space-y-2 text-sm">
+          <p>
+            A cobrança pelo app começa em <strong>{monthLabel(group.billing_start.slice(0, 10))}</strong>. Em {name} ninguém fica
+            devendo mensalidade nem avulso.
+          </p>
+          {!readOnly && (
+            <form action={setBillingStart}>
+              <input type="hidden" name="group_id" value={group.id} />
+              <input type="hidden" name="billing_start" value={month} />
+              <SubmitButton variant="secondary" className="w-full" pendingText="…">
+                Cobrar {name} também
+              </SubmitButton>
+            </form>
+          )}
+        </Card>
+      )}
+
+      {offerLaterStart && (
+        <Card className="space-y-2 text-sm">
+          <p>
+            Começou a usar o app agora e só vai cobrar a partir de {monthLabel(addMonths(month, 1))}? Assim {name} sai da
+            cobrança. Dá para mudar depois em Ajustes.
+          </p>
+          <form action={setBillingStart}>
+            <input type="hidden" name="group_id" value={group.id} />
+            <input type="hidden" name="billing_start" value={addMonths(month, 1)} />
+            <SubmitButton variant="secondary" className="w-full" pendingText="…">
+              Começar a cobrança em {monthLabel(addMonths(month, 1))}
+            </SubmitButton>
+          </form>
+        </Card>
+      )}
 
       {open.length > 0 && (
         <Card className="space-y-3">

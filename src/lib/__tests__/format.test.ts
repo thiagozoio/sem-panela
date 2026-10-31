@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, parseMoney, todayInBrazil } from "../format";
+import { addMonths, isBillingMonth, parseMoney, todayInBrazil } from "../format";
 import { subscriptionState } from "../subscription";
 
 describe("format", () => {
+  it("isBillingMonth: meses antes do início não são cobrados", () => {
+    expect(isBillingMonth(null, "2026-10-01")).toBe(true);
+    expect(isBillingMonth(undefined, "2026-10-01")).toBe(true);
+    expect(isBillingMonth("2026-11-01", "2026-10-01")).toBe(false);
+    expect(isBillingMonth("2026-11-01", "2026-11-01")).toBe(true);
+    expect(isBillingMonth("2026-11-01", "2027-01-01")).toBe(true);
+  });
+
   it("addMonths segura fim de mês", () => {
     expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
     expect(addMonths("2026-10-14", 1)).toBe("2026-11-14");

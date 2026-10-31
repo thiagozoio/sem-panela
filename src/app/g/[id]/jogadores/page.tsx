@@ -54,6 +54,14 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
           </Select>
         </Field>
       </div>
+      <div className="col-span-2">
+        <Field label="Pagamento" hint="Isento joga sem pagar e não aparece na cobrança do Financeiro.">
+          <Select name="exempt" defaultValue={member?.exempt ? "1" : "0"}>
+            <option value="0">Paga normalmente</option>
+            <option value="1">Isento (não paga)</option>
+          </Select>
+        </Field>
+      </div>
     </div>
   );
 }
@@ -169,6 +177,7 @@ function PlayerSummary({ member, sport, showSkill }: { member: Member; sport: Sp
       <span className="font-medium">{member.name}</span>
       {position && <Badge tone={position.value === "goleiro" ? "amber" : "neutral"}>{position.label.toLowerCase()}</Badge>}
       <Badge tone={member.kind === "mensalista" ? "green" : "neutral"}>{member.kind}</Badge>
+      {member.exempt && <Badge tone="amber">isento</Badge>}
       {member.is_organizer && <Badge>organizador</Badge>}
       {!member.user_id && <Badge>sem conta</Badge>}
       {showSkill && <span className="text-amber-600">{"★".repeat(member.skill)}</span>}

@@ -26,6 +26,8 @@ export type Group = {
   ranking?: RankingMode;
   /** Aba de amistosos (jogos contra outros times). Antes da migração 20261020000000 vem vazio. */
   matches?: boolean;
+  /** Mês (AAAA-MM-01) em que a cobrança pelo app começa; vazio = desde sempre. Antes da migração 20261031000000 vem vazio. */
+  billing_start?: string | null;
   created_at: string;
 };
 
@@ -42,6 +44,8 @@ export type Member = {
   kind: MemberKind;
   is_organizer: boolean;
   active: boolean;
+  /** Isento: joga sem pagar, fica fora da cobrança. Antes da migração 20261031000000 vem vazio. */
+  exempt?: boolean;
   created_at: string;
 };
 
