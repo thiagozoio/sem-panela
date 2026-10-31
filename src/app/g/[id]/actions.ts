@@ -207,6 +207,12 @@ export async function saveRatings(fd: FormData) {
 // Jogadores
 // ---------------------------------------------------------------------------
 
+/** À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo. */
+async function saveExempt(supabase: Client, groupId: string, memberId: string, fd: FormData) {
+  if (!fd.has("exempt")) return;
+  await supabase.from("members").update({ exempt: str(fd, "exempt") === "1" }).eq("id", memberId).eq("group_id", groupId);
+}
+
 function memberFields(fd: FormData) {
   const value = str(fd, "position");
   const position: Position = ALL_POSITIONS.includes(value as Position) ? (value as Position) : "linha";
@@ -237,6 +243,7 @@ export async function addMember(fd: FormData) {
   if (!fields.name) return;
   const { data } = await supabase.from("members").insert({ group_id: groupId, ...fields }).select("id").single();
   if (data) {
+    await saveExempt(supabase, groupId, data.id, fd);
     await saveSkill(supabase, groupId, data.id, clampInt(str(fd, "skill"), 1, 5, 3));
     await savePhone(supabase, groupId, data.id, str(fd, "phone").slice(0, 30));
   }
@@ -250,6 +257,7 @@ export async function updateMember(fd: FormData) {
   const fields = memberFields(fd);
   if (!fields.name) return;
   await supabase.from("members").update(fields).eq("id", memberId).eq("group_id", groupId);
+  await saveExempt(supabase, groupId, memberId, fd);
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
   await savePhone(supabase, groupId, memberId, str(fd, "phone").slice(0, 30));
   refresh();

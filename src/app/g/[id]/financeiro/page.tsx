@@ -64,7 +64,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
   const currentMonth = monthStart(todayInBrazil());
 
   const monthly: Row[] = members
-    .filter((m) => charging && m.active && m.kind === "mensalista")
+    .filter((m) => charging && m.active && !m.exempt && m.kind === "mensalista")
     .map((m) => ({
       member: m,
       kind: "mensal",
@@ -81,7 +81,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       group.priority_hours,
     );
     const rows: Row[] = confirmed
-      .filter((e) => e.member.kind === "avulso")
+      .filter((e) => e.member.kind === "avulso" && !e.member.exempt)
       .map((e) => ({
         member: e.member,
         kind: "avulso",

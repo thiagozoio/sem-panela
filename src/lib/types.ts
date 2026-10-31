@@ -44,6 +44,8 @@ export type Member = {
   kind: MemberKind;
   is_organizer: boolean;
   active: boolean;
+  /** Isento: joga sem pagar, fica fora da cobrança. Antes da migração 20261031000000 vem vazio. */
+  exempt?: boolean;
   created_at: string;
 };
 
