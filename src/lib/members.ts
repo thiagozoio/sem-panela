@@ -1,6 +1,6 @@
 import type { Member } from "./types";
 
-/** Joga as peladas (sócio só paga a mensalidade). */
+/** É chamado para as peladas (o sócio só paga a mensalidade, mas pode ser chamado num jogo). */
 export const plays = (m: Pick<Member, "kind">) => m.kind !== "socio";
 
 /** Entra na cobrança da mensalidade. */

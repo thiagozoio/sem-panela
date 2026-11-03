@@ -13,12 +13,15 @@ export function GuestForm({
   gameId,
   positions,
   teams,
+  fixed = false,
 }: {
   groupId: string;
   gameId: string;
   positions: { value: string; label: string }[];
-  /** Times já montados no jogo (vazio = ainda não sorteou). */
+  /** Times para escolher: os do jogo, se já montados, ou os times fixos do mês. */
   teams: { name: string; count: number }[];
+  /** Os times ainda não foram montados, então a escolha vale para os times fixos do mês. */
+  fixed?: boolean;
 }) {
   const [state, action] = useActionState(addGuest, {});
   return (
@@ -47,9 +50,12 @@ export function GuestForm({
         </Field>
         {teams.length > 0 && (
           <div className="col-span-2">
-            <Field label="Time" hint="Escolha o time que está faltando gente.">
+            <Field
+              label="Time"
+              hint={fixed ? "Times fixos do mês. Ele já entra nesse time quando você usar os times fixos." : "Escolha o time que está faltando gente."}
+            >
               <Select name="team" defaultValue="">
-                <option value="">O que tem menos gente</option>
+                <option value="">{fixed ? "Deixar sem time" : "O que tem menos gente"}</option>
                 {teams.map((t) => (
                   <option key={t.name} value={t.name}>
                     {t.name} ({t.count})
