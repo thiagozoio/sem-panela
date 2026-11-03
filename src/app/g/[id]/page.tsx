@@ -228,7 +228,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
                 groupId={group.id}
                 gameId={game.id}
                 positions={positionOptions(sport)}
-                teams={game.teams?.map((t) => ({ name: t.name, count: t.players.length })) ?? []}
+                teams={
+                  game.teams?.map((t) => ({ name: t.name, count: t.players.length })) ??
+                  (fixedRows ?? []).map((t) => ({ name: t.name, count: t.member_ids.length }))
+                }
+                fixed={!game.teams}
               />
             </div>
           </details>

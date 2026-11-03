@@ -78,7 +78,8 @@ export type GuestState = { error?: string; added?: string };
 
 /**
  * Põe um convidado só neste jogo (quando faltar gente). Ele não entra em Jogadores e não paga
- * (fica isento). Se os times já estão montados, entra no time escolhido ou no que tem menos gente.
+ * (fica isento). Entra no time escolhido: nos times do jogo, se já estão montados, ou nos times
+ * fixos do mês, para já entrar no time certo quando o organizador usar os times fixos.
  * Se já veio como convidado antes com o mesmo nome, reaproveita (gols e notas ficam juntos).
  */
 export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestState> {
@@ -127,15 +128,37 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
       .eq("member_id", memberId);
   }
 
-  // Times já montados no jogo: o convidado entra direto no time escolhido.
   const team = str(fd, "team");
-  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
+  let joined = "";
   if (game?.teams?.length) {
+    // Times do jogo já montados: entra direto no time escolhido.
     const player = { member_id: memberId, name, position: positionOf(sportOf(group.sport), position) };
     await supabase.from("games").update({ teams: addToTeam(game.teams, player, team) }).eq("id", gameId);
+    joined = team;
+  } else if (team && game) {
+    // Ainda sem sorteio: entra no time fixo do mês, para já cair nele em "Usar times fixos".
+    joined = (await putInFixedTeam(supabase, groupId, monthOf(game.starts_at), memberId, team)) ? team : "";
   }
   refresh();
-  return { added: team && game?.teams?.length ? `${name} entrou no ${team}` : `${name} entrou na lista` };
+  return { added: joined ? `${name} entrou no ${joined}` : `${name} entrou na lista` };
+}
+
+/** Põe o convidado num time fixo do mês (e tira dos outros). Devolve false se o time não existe. */
+async function putInFixedTeam(supabase: Client, groupId: string, month: string, memberId: string, team: string) {
+  const { data: fixed } = await supabase
+    .from("fixed_teams")
+    .select("id, name, member_ids")
+    .eq("group_id", groupId)
+    .eq("month", month)
+    .returns<Pick<FixedTeam, "id" | "name" | "member_ids">[]>();
+  const target = (fixed ?? []).find((t) => t.name === team);
+  if (!target) return false;
+  for (const t of fixed ?? []) {
+    const ids = t.id === target.id ? [...new Set([...t.member_ids, memberId])] : t.member_ids.filter((id) => id !== memberId);
+    if (ids.length !== t.member_ids.length) await supabase.from("fixed_teams").update({ member_ids: ids }).eq("id", t.id);
+  }
+  return true;
 }
 
 /** Tira o convidado da lista e do time deste jogo. */
@@ -143,10 +166,12 @@ export async function removeGuest(fd: FormData) {
   const gameId = str(fd, "game_id");
   const memberId = str(fd, "member_id");
   const supabase = await createClient();
-  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
   if (game?.teams?.length) {
     await supabase.from("games").update({ teams: removeFromTeams(game.teams, memberId) }).eq("id", gameId);
   }
+  // Também sai dos times fixos do mês, onde só convidados entram por aqui.
+  if (game) await putInFixedTeam(supabase, str(fd, "group_id"), monthOf(game.starts_at), memberId, "");
   await clearAttendance(fd);
 }
 
