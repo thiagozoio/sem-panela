@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Card, Field, Input, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { INVITE_COOKIE } from "@/lib/invite";
 
 export const metadata: Metadata = { title: "Convite" };
 
@@ -22,6 +24,7 @@ async function join(formData: FormData) {
     p_member_id: claim && claim !== "novo" ? claim : null,
   });
   if (error || !data) redirect(`/convite/${code}?erro=1`);
+  (await cookies()).delete(INVITE_COOKIE);
   redirect(`/g/${data}`);
 }
 

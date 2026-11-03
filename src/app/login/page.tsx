@@ -21,7 +21,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <div className="text-center">
         <p className="text-4xl">⚽</p>
         <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">Sem Panela</h1>
-        <p className="text-sm text-neutral-600">Entre para ver a lista da sua pelada.</p>
+        <p className="text-sm text-neutral-600">
+          {target.startsWith("/convite/")
+            ? "Você foi convidado para uma pelada. Entre e você cai direto nela."
+            : "Entre para ver a lista da sua pelada."}
+        </p>
       </div>
       <Card>
         {erro && (

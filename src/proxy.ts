@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase/env";
+import { INVITE_COOKIE, INVITE_COOKIE_MAX_AGE, inviteCodeFromPath } from "@/lib/invite";
 
 // Renova a sessão do Supabase a cada requisição. A checagem de acesso de verdade
 // fica nas páginas (requireUser) e no banco (RLS).
@@ -22,6 +23,19 @@ export async function proxy(request: NextRequest) {
   });
 
   await supabase.auth.getClaims();
+
+  // Guarda o convite aberto para levar a pessoa de volta a ele depois do login,
+  // mesmo que o "next" se perca (e-mail aberto em outro navegador, app instalado...).
+  const invite = inviteCodeFromPath(request.nextUrl.pathname);
+  if (invite) {
+    response.cookies.set(INVITE_COOKIE, invite, {
+      maxAge: INVITE_COOKIE_MAX_AGE,
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: request.nextUrl.protocol === "https:",
+    });
+  }
   return response;
 }
 

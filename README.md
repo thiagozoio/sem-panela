@@ -67,14 +67,18 @@ npm run lint
    > ```sql
    > grant select, insert, update, delete on public.nova_tabela to authenticated, service_role;
    > ```
-3. **Authentication > URL Configuration**: `Site URL` = URL do app (ex.: `https://sempanela.vercel.app`) e adicione `https://sempanela.vercel.app/**` e `http://localhost:3000/**` em *Redirect URLs*.
-4. **Authentication > Email Templates**, nos modelos *Magic Link* e *Confirm signup*, troque o corpo por algo assim (o link funciona até aberto em outro navegador, e o código serve para quem está no app instalado):
+3. **Authentication > URL Configuration**: `Site URL` = URL do app (ex.: `https://sempanela.app.br`) e adicione `https://sempanela.app.br/**` e `http://localhost:3000/**` em *Redirect URLs*.
+4. **Authentication > Email Templates**: troque **os dois** modelos, *Confirm signup* (jogador novo) e *Magic Link* (quem já tem conta). O padrão do Supabase vem em inglês ("Confirm your email address"), sem código e com um link que só funciona no mesmo navegador. Use o assunto `Seu acesso ao Sem Panela ⚽` e um corpo assim (o link funciona até aberto em outro navegador, e o código serve para quem está no app instalado):
 
    ```html
-   <h2>Seu acesso ao Sem Panela</h2>
+   <h2>Sem Panela ⚽</h2>
+   <p><strong>Não existe senha.</strong> Toque no botão para entrar:</p>
    <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Entrar no Sem Panela</a></p>
-   <p>Ou digite o código: <strong>{{ .Token }}</strong></p>
+   <p>Ou volte para o Sem Panela e digite o código: <strong>{{ .Token }}</strong></p>
+   <p>O link e o código valem por 1 hora. Se você não pediu este acesso, ignore este e-mail.</p>
    ```
+
+   O link usa `{{ .RedirectTo }}`, então o domínio do app precisa estar em *Redirect URLs* (passo 3); senão o Supabase troca pelo `Site URL` e o link quebra.
 
 5. Para virar admin, depois do primeiro login rode no SQL Editor:
 
@@ -92,6 +96,8 @@ O e-mail padrão do Supabase tem limite baixo de envios por hora; para produçã
 - Vale por 7 dias. Depois do primeiro uso ainda funciona por 1 hora (para abrir no navegador e depois no app instalado). Gerar outro invalida o anterior.
 - Só serve para jogador comum: nunca para organizador, dono de grupo, admin ou quem já entra com e-mail.
 - Precisa da variável `SUPABASE_SECRET_KEY` (Project Settings > API Keys > *Secret key*) no servidor. A conta criada usa um e-mail interno `<id>@jogador.sempanela.app.br` que não recebe mensagens.
+
+**Convite guardado.** Quem abre `/convite/<código>` ganha um cookie com o código por 30 dias. Se depois de entrar (e-mail aberto em outro navegador, Google, link pessoal, app instalado) a pessoa cair em *Minhas peladas* sem nenhum grupo, o app manda de volta para o convite. Na tela vazia também dá para colar o link de convite.
 
 **Entrar com Google.** Crie um *OAuth Client ID* (tipo *Web application*) no Google Cloud Console com a URI de redirecionamento `https://<projeto>.supabase.co/auth/v1/callback`, cole o Client ID e o Secret em **Authentication > Providers > Google** no Supabase e ponha `NEXT_PUBLIC_GOOGLE_LOGIN=1` na Vercel.
 
