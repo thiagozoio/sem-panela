@@ -6,9 +6,9 @@ import { getGroupContext } from "@/lib/groups";
 import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
 import { formatGameDate, monthOf } from "@/lib/format";
-import { listMessage, teamsMessage } from "@/lib/messages";
+import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
 import { byPosition, positionInfo, sportOf, type Sport } from "@/lib/sports";
-import type { Attendance, Game, Member } from "@/lib/types";
+import type { Attendance, FixedTeam, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { PushToggle } from "@/components/push-toggle";
@@ -32,14 +32,14 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
   const { attendances, ...game } = gameRow;
   const sport = sportOf(group.sport);
-  const [{ count: fixedTeams }, { data: lastGame }] = await Promise.all([
-    isOrganizer && !readOnly
-      ? supabase
-          .from("fixed_teams")
-          .select("id", { count: "exact", head: true })
-          .eq("group_id", group.id)
-          .eq("month", monthOf(game.starts_at))
-      : Promise.resolve({ count: 0 }),
+  const [{ data: fixedRows }, { data: lastGame }] = await Promise.all([
+    supabase
+      .from("fixed_teams")
+      .select("name, member_ids")
+      .eq("group_id", group.id)
+      .eq("month", monthOf(game.starts_at))
+      .order("sort")
+      .returns<Pick<FixedTeam, "name" | "member_ids">[]>(),
     supabase
       .from("games")
       .select("id, starts_at, teams, scores")
@@ -58,6 +58,12 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const myOut = me ? list.out.some((m) => m.id === me.id) : false;
   const origin = await siteUrl();
   const push = pushEnabled();
+  const fixedTeams = isOrganizer && !readOnly ? (fixedRows?.length ?? 0) : 0;
+  // Na lista mandada no WhatsApp, cada confirmado aparece com o time dele:
+  // os times do jogo (sorteados ou aplicados) ou, se ainda não tiver, os times fixos do mês.
+  const teamOf = teamNames(
+    game.teams?.map((t) => ({ name: t.name, member_ids: t.players.map((p) => p.member_id) })) ?? fixedRows ?? [],
+  );
 
   const drawnIds = new Set(game.teams?.flatMap((t) => t.players.map((p) => p.member_id)) ?? []);
   const listChanged =
@@ -148,7 +154,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         )}
         <ShareButtons
           label="Mandar lista no WhatsApp"
-          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, group.max_players, `${origin}/g/${group.id}`, sport)}
+          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, group.max_players, `${origin}/g/${group.id}`, sport, teamOf)}
         />
       </Card>
 

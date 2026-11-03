@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { buttonStyles, ErrorText } from "@/components/ui";
-import { CopyField } from "@/components/share";
+import { CopyField, WhatsAppLink } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { whatsappLink } from "@/lib/format";
 import { whatsappTo } from "@/lib/matches";
@@ -17,9 +17,9 @@ export function AccessLinkButton({ memberId, memberName, groupName, phone }: { m
     const text = accessMessage(memberName, groupName, state.url);
     return (
       <div className="space-y-2">
-        <a href={whatsappTo(phone, text) || whatsappLink(text)} target="_blank" rel="noreferrer" className={`${buttonStyles.primary} w-full`}>
+        <WhatsAppLink href={whatsappTo(phone, text) || whatsappLink(text)} className={`${buttonStyles.primary} w-full`}>
           Mandar no WhatsApp{phone ? "" : " (escolha o contato)"}
-        </a>
+        </WhatsAppLink>
         <CopyField value={state.url} />
         <p className="text-xs text-neutral-500">Vale por 7 dias. Se gerar outro, este para de funcionar.</p>
       </div>

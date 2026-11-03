@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, isBillingMonth, parseMoney, todayInBrazil } from "../format";
+import { addMonths, isBillingMonth, parseMoney, todayInBrazil, whatsappAppUrl, whatsappLink } from "../format";
 import { subscriptionState } from "../subscription";
 
 describe("format", () => {
@@ -33,5 +33,16 @@ describe("subscriptionState", () => {
     expect(subscriptionState("2026-10-10", "2026-10-14").status).toBe("grace");
     expect(subscriptionState("2026-10-07", "2026-10-14").status).toBe("grace");
     expect(subscriptionState("2026-10-06", "2026-10-14").status).toBe("read_only");
+  });
+});
+
+describe("whatsappAppUrl", () => {
+  it("abre o app com o texto, mantendo quebras de linha e emojis", () => {
+    const text = "⚽ *Pelada*\n1. João & Zé";
+    expect(whatsappAppUrl(whatsappLink(text))).toBe(`whatsapp://send?text=${encodeURIComponent(text)}`);
+  });
+  it("leva o telefone quando o link é para um contato", () => {
+    expect(whatsappAppUrl("https://wa.me/5511999998888?text=oi%20tudo")).toBe("whatsapp://send?phone=5511999998888&text=oi%20tudo");
+    expect(whatsappAppUrl("https://wa.me/5511999998888")).toBe("whatsapp://send?phone=5511999998888");
   });
 });
