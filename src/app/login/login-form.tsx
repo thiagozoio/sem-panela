@@ -18,6 +18,9 @@ export function LoginForm({ next }: { next: string }) {
           Mandamos um e-mail para <strong>{state.email}</strong>. Toque no link do e-mail <em>ou</em> digite aqui o
           código que veio nele.
         </p>
+        <p className="text-xs text-neutral-500">
+          Não existe senha: o link e o código são o seu acesso. Não chegou? Olhe no spam ou na aba Promoções.
+        </p>
         <Field label="Código">
           <Input name="token" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={10} autoFocus />
         </Field>
@@ -32,7 +35,7 @@ export function LoginForm({ next }: { next: string }) {
 
   return (
     <form action={action} className="space-y-4" key="email">
-      <Field label="Seu e-mail" hint="Sem senha: mandamos um link e um código para você entrar.">
+      <Field label="Seu e-mail" hint="Não precisa de senha nem de cadastro: mandamos um link e um código para você entrar.">
         <Input name="email" type="email" autoComplete="email" placeholder="voce@email.com" defaultValue={state.email} autoFocus required />
       </Field>
       <ErrorText>{state.error}</ErrorText>
