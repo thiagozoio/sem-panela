@@ -11,16 +11,27 @@ export function listMessage(
   maxPlayers: number,
   link: string,
   sport: Sport,
+  teamOf: Map<string, string> = new Map(),
 ): string {
   const lines = [`${sport === "volei" ? "🏐" : "⚽"} *${groupName}*`, formatGameDate(startsAt), ""];
   lines.push(`*Confirmados (${confirmed.length}/${maxPlayers})*`);
-  confirmed.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}${positionSuffix(sport, e.member.position)}`));
+  confirmed.forEach((e, i) => {
+    const team = teamOf.get(e.member.id);
+    lines.push(`${i + 1}. ${e.member.name}${positionSuffix(sport, e.member.position)}${team ? ` · ${team}` : ""}`);
+  });
   if (waitlist.length) {
     lines.push("", "*Lista de espera*");
     waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}`));
   }
   lines.push("", `Confirme aqui: ${link}`);
   return lines.join("\n");
+}
+
+/** Time de cada jogador (member_id → nome do time), a partir dos times do jogo ou dos times fixos do mês. */
+export function teamNames(teams: { name: string; member_ids: string[] }[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const t of teams) for (const id of t.member_ids) if (!map.has(id)) map.set(id, t.name);
+  return map;
 }
 
 function positionSuffix(sport: Sport, position: string): string {

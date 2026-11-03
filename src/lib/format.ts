@@ -88,3 +88,18 @@ export function monthLabel(month: string): string {
 export function whatsappLink(text: string): string {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
+
+/**
+ * Converte um link wa.me no link que abre direto o app do WhatsApp (whatsapp://send).
+ * No celular, principalmente no app instalado na tela inicial, o wa.me abre numa
+ * janela de navegador que nem sempre passa a mensagem para o WhatsApp.
+ */
+export function whatsappAppUrl(waMe: string): string {
+  const url = new URL(waMe);
+  const params: string[] = [];
+  const phone = url.pathname.replace(/\D/g, "");
+  if (phone) params.push(`phone=${phone}`);
+  const text = url.searchParams.get("text");
+  if (text) params.push(`text=${encodeURIComponent(text)}`);
+  return `whatsapp://send${params.length ? `?${params.join("&")}` : ""}`;
+}
