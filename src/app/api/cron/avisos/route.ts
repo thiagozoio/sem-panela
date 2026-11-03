@@ -1,4 +1,5 @@
 import { splitList } from "@/lib/attendance";
+import { paysMonthly, regularPlayer } from "@/lib/members";
 import { isBillingMonth, monthLabel, monthStart, todayInBrazil } from "@/lib/format";
 import {
   gamesToRemind,
@@ -62,7 +63,7 @@ async function gameReminders(admin: AdminClient, group: Group, members: Member[]
     const { confirmed } = splitList(rows, members, group.max_players, startsAt, group.priority_hours);
     if (when === "hoje" && confirmed.length >= group.max_players) continue;
     const answered = new Set(rows.map((a) => a.member_id));
-    const userIds = members.filter((m) => m.user_id && !answered.has(m.id)).map((m) => m.user_id!);
+    const userIds = members.filter((m) => regularPlayer(m) && m.user_id && !answered.has(m.id)).map((m) => m.user_id!);
     sent += await sendPush(userIds, notify.gameReminder(group.id, group.name, startsAt, when), admin);
   }
   return sent;
@@ -74,7 +75,7 @@ async function monthlyFeeReminder(admin: AdminClient, group: Group, members: Mem
   const { data: paid } = await admin.from("payments").select("member_id").eq("group_id", group.id).eq("kind", "mensal").eq("month", month);
   const paidIds = new Set((paid ?? []).map((p) => p.member_id));
   const userIds = members
-    .filter((m) => m.kind === "mensalista" && !m.exempt && m.user_id && !paidIds.has(m.id))
+    .filter((m) => paysMonthly(m) && !m.exempt && m.user_id && !paidIds.has(m.id))
     .map((m) => m.user_id!);
   return sendPush(userIds, notify.monthlyFee(group.id, group.name, monthLabel(month), group.monthly_fee_cents, group.pix_key), admin);
 }

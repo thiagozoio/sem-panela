@@ -2,7 +2,8 @@ import type { Position, Sport } from "./sports";
 import type { RankingMode } from "./standings";
 
 export type { Position, Sport };
-export type MemberKind = "mensalista" | "avulso";
+/** Sócio: paga a mensalidade, mas não joga as peladas (antes da migração 20261103000000 não existe). */
+export type MemberKind = "mensalista" | "avulso" | "socio";
 
 export type Group = {
   id: string;
@@ -46,6 +47,8 @@ export type Member = {
   active: boolean;
   /** Isento: joga sem pagar, fica fora da cobrança. Antes da migração 20261031000000 vem vazio. */
   exempt?: boolean;
+  /** Convidado de um jogo só: fica fora de Jogadores e dos pendentes. Antes da migração 20261103000000 vem vazio. */
+  guest?: boolean;
   created_at: string;
 };
 

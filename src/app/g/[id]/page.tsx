@@ -7,14 +7,16 @@ import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
 import { formatGameDate, monthOf } from "@/lib/format";
 import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
-import { byPosition, positionInfo, sportOf, type Sport } from "@/lib/sports";
+import { byPosition, positionInfo, positionOptions, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, FixedTeam, Game, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { PushToggle } from "@/components/push-toggle";
 import { pushEnabled, VAPID_PUBLIC_KEY } from "@/lib/push";
 import { OrganizerPush } from "./organizer-push";
-import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, setAttendance } from "./actions";
+import { GuestForm } from "./guest-form";
+import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, removeGuest, setAttendance } from "./actions";
+import { plays, regularPlayer } from "@/lib/members";
 
 export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const { id } = await params;
@@ -52,7 +54,9 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
 
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
-  const pending = members.filter((m) => m.active && !answered.has(m.id));
+  const pending = members.filter((m) => regularPlayer(m) && !answered.has(m.id));
+  // Convidados que estão na lista deste jogo (confirmados ou na espera).
+  const guests = [...list.confirmed, ...list.waitlist].filter((e) => e.member.guest).map((e) => e.member);
   const myIndex = me ? list.confirmed.findIndex((e) => e.member.id === me.id) : -1;
   const myWait = me ? list.waitlist.findIndex((e) => e.member.id === me.id) : -1;
   const myOut = me ? list.out.some((m) => m.id === me.id) : false;
@@ -91,7 +95,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
           </Badge>
         </div>
 
-        {me && (
+        {me && !plays(me) && (
+          <p className="text-sm text-neutral-600">Você está como sócio: paga a mensalidade, mas não entra na lista dos jogos.</p>
+        )}
+
+        {me && plays(me) && (
           <div className="space-y-2">
             <p className="text-sm text-neutral-700">
               {myIndex >= 0
@@ -122,7 +130,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         )}
       </Card>
 
-      {me && push && <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="prompt" />}
+      {me && plays(me) && push && <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="prompt" />}
 
       {lastGame && (
         <Link
@@ -164,7 +172,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
             <summary className="cursor-pointer font-semibold">Marcar presença de outros jogadores</summary>
             <ul className="mt-3 divide-y divide-neutral-100">
               {members
-                .filter((m) => m.active)
+                .filter(regularPlayer)
                 .map((m) => (
                   <AttendanceRow
                     key={m.id}
@@ -183,6 +191,46 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
             {pending.length > 0 && (
               <p className="mt-3 text-xs text-neutral-500">Ainda não responderam: {pending.map((m) => m.name).join(", ")}</p>
             )}
+          </details>
+        </Card>
+      )}
+
+      {isOrganizer && !readOnly && (
+        <Card>
+          <details open={guests.length > 0}>
+            <summary className="cursor-pointer font-semibold">
+              Adicionar convidado{guests.length > 0 && ` (${guests.length})`}
+            </summary>
+            <p className="mt-2 text-sm text-neutral-600">
+              Vai faltar gente? Ponha um convidado só neste jogo. Ele entra na lista, no sorteio e na mensagem do
+              WhatsApp, mas não vira jogador do grupo e não paga nada.
+            </p>
+            {guests.length > 0 && (
+              <ul className="mt-3 divide-y divide-neutral-100">
+                {guests.map((m) => (
+                  <li key={m.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                    <span>
+                      {m.name}
+                      {teamOf.get(m.id) && <span className="text-neutral-400"> · {teamOf.get(m.id)}</span>}
+                    </span>
+                    <form action={removeGuest}>
+                      {hidden(m.id)}
+                      <Button variant="ghost" className="px-3 py-1.5">
+                        Tirar
+                      </Button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 border-t border-neutral-100 pt-3">
+              <GuestForm
+                groupId={group.id}
+                gameId={game.id}
+                positions={positionOptions(sport)}
+                teams={game.teams?.map((t) => ({ name: t.name, count: t.players.length })) ?? []}
+              />
+            </div>
           </details>
         </Card>
       )}
@@ -277,6 +325,7 @@ function PlayerList({ entries, sport, empty }: { entries: ListEntry[]; sport: Sp
           {positionInfo(sport, e.member.position)?.value === "goleiro" && <span title="Goleiro">🧤</span>}
           <PositionTag sport={sport} position={e.member.position} />
           {e.member.kind === "mensalista" && <Badge>mensalista</Badge>}
+          {e.member.guest && <Badge tone="amber">convidado</Badge>}
         </li>
       ))}
     </ol>
