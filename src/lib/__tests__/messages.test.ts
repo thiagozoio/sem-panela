@@ -13,7 +13,7 @@ describe("listMessage", () => {
   const confirmed = [entry("a", "Ana", "goleiro"), entry("b", "Beto"), entry("c", "Caio")];
 
   it("sem times, lista só os nomes", () => {
-    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], 10, "https://x/g/1", "society");
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [], 10, "https://x/g/1", "society");
     expect(msg).toContain("1. Ana 🧤\n");
     expect(msg).not.toContain("·");
   });
@@ -23,10 +23,19 @@ describe("listMessage", () => {
       { name: "Azul", member_ids: ["a", "b"] },
       { name: "Branco", member_ids: ["x"] },
     ]);
-    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], 10, "https://x/g/1", "society", teamOf);
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [], 10, "https://x/g/1", "society", teamOf);
     expect(msg).toContain("1. Ana 🧤 · Azul");
     expect(msg).toContain("2. Beto");
     expect(msg).toMatch(/2\. Beto.* · Azul/);
     expect(msg).toMatch(/3\. Caio[^\n·]*\n/);
+  });
+
+  it("mostra quem avisou que não vai", () => {
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [{ name: "Davi" }, { name: "Edu" }], 10, "https://x/g/1", "society");
+    expect(msg).toContain("*Não vão (2)*\n❌ Davi\n❌ Edu");
+  });
+  it("sem ninguém fora, não mostra a seção", () => {
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [], 10, "https://x/g/1", "society");
+    expect(msg).not.toContain("Não vão");
   });
 });

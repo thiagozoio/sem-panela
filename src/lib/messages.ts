@@ -8,6 +8,7 @@ export function listMessage(
   startsAt: string,
   confirmed: ListEntry[],
   waitlist: ListEntry[],
+  out: { name: string }[],
   maxPlayers: number,
   link: string,
   sport: Sport,
@@ -22,6 +23,10 @@ export function listMessage(
   if (waitlist.length) {
     lines.push("", "*Lista de espera*");
     waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}`));
+  }
+  if (out.length) {
+    lines.push("", `*Não vão (${out.length})*`);
+    out.forEach((m) => lines.push(`❌ ${m.name}`));
   }
   lines.push("", `Confirme aqui: ${link}`);
   return lines.join("\n");
