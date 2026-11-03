@@ -1,10 +1,11 @@
-import { plays } from "./members";
 import type { Attendance, Member } from "./types";
 
 export type ListEntry = { member: Member; confirmedAt: string; priority: boolean };
 
 /**
  * Divide quem confirmou entre lista principal e lista de espera.
+ * O sócio não é chamado para os jogos, mas entra na lista quando o organizador o chama
+ * (é a presença marcada que o põe aqui).
  * Mensalistas que confirmaram até `priorityHours` antes do jogo passam na frente;
  * dentro de cada faixa vale a ordem de confirmação.
  */
@@ -22,7 +23,7 @@ export function splitList(
   const out: Member[] = [];
   for (const a of attendances) {
     const member = byId.get(a.member_id);
-    if (!member || !member.active || !plays(member)) continue;
+    if (!member || !member.active) continue;
     if (!a.going) {
       out.push(member);
       continue;

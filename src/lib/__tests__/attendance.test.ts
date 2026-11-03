@@ -25,6 +25,17 @@ describe("splitList", () => {
     expect(r.waitlist.map((e) => e.member.id)).toEqual(["bia"]);
   });
 
+  it("sócio só entra na lista quando o organizador marca a presença", () => {
+    const withSocio = [...members, member("eva", "socio")];
+    const sem = splitList([att("ana", "2026-10-13T10:00:00Z")], withSocio, 10, START, 24);
+    expect(sem.confirmed.map((e) => e.member.id)).toEqual(["ana"]);
+    const com = splitList(
+      [att("ana", "2026-10-13T10:00:00Z"), att("eva", "2026-10-14T10:00:00Z")],
+      withSocio, 10, START, 24,
+    );
+    expect(com.confirmed.map((e) => e.member.id)).toEqual(["ana", "eva"]);
+  });
+
   it("mensalista que confirma antes do prazo passa na frente", () => {
     const r = splitList(
       [att("ana", "2026-10-13T10:00:00Z"), att("duda", "2026-10-13T11:00:00Z"), att("bia", "2026-10-14T09:00:00Z")],

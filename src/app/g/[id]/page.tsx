@@ -55,6 +55,8 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
   const pending = members.filter((m) => regularPlayer(m) && !answered.has(m.id));
+  // Sócios: não são chamados, mas o organizador pode chamar para um jogo.
+  const socios = members.filter((m) => m.active && !plays(m));
   // Convidados que estão na lista deste jogo (confirmados ou na espera).
   const guests = [...list.confirmed, ...list.waitlist].filter((e) => e.member.guest).map((e) => e.member);
   const myIndex = me ? list.confirmed.findIndex((e) => e.member.id === me.id) : -1;
@@ -96,7 +98,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         </div>
 
         {me && !plays(me) && (
-          <p className="text-sm text-neutral-600">Você está como sócio: paga a mensalidade, mas não entra na lista dos jogos.</p>
+          <p className="text-sm text-neutral-600">
+            {myIndex >= 0 || myWait >= 0
+              ? "O organizador te chamou para este jogo. Você está na lista."
+              : "Você está como sócio: paga a mensalidade e o organizador te chama quando faltar gente."}
+          </p>
         )}
 
         {me && plays(me) && (
@@ -190,6 +196,30 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
             </ul>
             {pending.length > 0 && (
               <p className="mt-3 text-xs text-neutral-500">Ainda não responderam: {pending.map((m) => m.name).join(", ")}</p>
+            )}
+            {socios.length > 0 && (
+              <>
+                <p className="mt-4 text-sm font-semibold">Sócios</p>
+                <p className="text-xs text-neutral-500">
+                  Eles não são chamados toda semana. Faltou gente? Marque “Vai” para o sócio entrar neste jogo.
+                </p>
+                <ul className="mt-1 divide-y divide-neutral-100">
+                  {socios.map((m) => (
+                    <AttendanceRow
+                      key={m.id}
+                      member={m}
+                      status={
+                        list.confirmed.some((e) => e.member.id === m.id) || list.waitlist.some((e) => e.member.id === m.id)
+                          ? "in"
+                          : list.out.some((o) => o.id === m.id)
+                            ? "out"
+                            : "none"
+                      }
+                      hidden={hidden(m.id)}
+                    />
+                  ))}
+                </ul>
+              </>
             )}
           </details>
         </Card>
@@ -330,6 +360,7 @@ function PlayerList({ entries, sport, empty }: { entries: ListEntry[]; sport: Sp
           <PositionTag sport={sport} position={e.member.position} />
           {e.member.kind === "mensalista" && <Badge>mensalista</Badge>}
           {e.member.guest && <Badge tone="amber">convidado</Badge>}
+          {!plays(e.member) && <Badge tone="green">sócio</Badge>}
         </li>
       ))}
     </ol>
