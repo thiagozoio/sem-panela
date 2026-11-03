@@ -60,7 +60,7 @@ export async function notifyPending(groupId: string, gameId: string): Promise<nu
   if (!data) return 0;
   const { group, game, members, attendances, admin } = data;
   const answered = new Set(attendances.map((a) => a.member_id));
-  const userIds = members.filter((m) => m.active && m.user_id && !answered.has(m.id)).map((m) => m.user_id!);
+  const userIds = members.filter((m) => m.active && !m.guest && m.user_id && !answered.has(m.id)).map((m) => m.user_id!);
   return sendPush(userIds, notify.pendingReminder(group.id, group.name, game.starts_at), admin);
 }
 

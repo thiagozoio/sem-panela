@@ -28,7 +28,7 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
 
   const byId = new Map(members.map((m) => [m.id, m]));
   const inTeam = new Set(teams.flatMap((t) => t.member_ids));
-  const withoutTeam = members.filter((m) => m.active && !inTeam.has(m.id));
+  const withoutTeam = members.filter((m) => m.active && !m.guest && !inTeam.has(m.id));
   const sport = sportOf(group.sport);
   const order = byPosition(sport);
   const tag = (m: Member) => {

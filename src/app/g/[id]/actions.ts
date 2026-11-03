@@ -73,6 +73,63 @@ export async function clearAttendance(fd: FormData) {
   refresh();
 }
 
+export type GuestState = { error?: string; added?: string };
+
+/**
+ * Põe um convidado só neste jogo (quando faltar gente). Ele não entra em Jogadores nem na
+ * mensalidade; paga o avulso do jogo, a não ser que venha marcado como isento.
+ * Se já veio como convidado antes com o mesmo nome, reaproveita (gols e notas ficam juntos).
+ */
+export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestState> {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const name = str(fd, "name").slice(0, 60);
+  if (!name) return { error: "Escreva o nome do convidado." };
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.isOrganizer || ctx.readOnly) return { error: "Só o organizador pode pôr convidados." };
+  const { supabase, members } = ctx;
+  const value = str(fd, "position");
+  const position: Position = ALL_POSITIONS.includes(value as Position) ? (value as Position) : "linha";
+  const key = name.toLocaleLowerCase("pt-BR");
+  if (members.some((m) => !m.guest && m.active && m.name.toLocaleLowerCase("pt-BR") === key)) {
+    return { error: `${name} já é do grupo. Marque a presença em “Marcar presença de outros jogadores”.` };
+  }
+
+  let memberId = members.find((m) => m.guest && m.name.toLocaleLowerCase("pt-BR") === key)?.id;
+  if (memberId) {
+    await supabase.from("members").update({ position, active: true }).eq("id", memberId).eq("group_id", groupId);
+  } else {
+    const { data, error } = await supabase
+      .from("members")
+      .insert({ group_id: groupId, name, position, kind: "avulso", guest: true })
+      .select("id")
+      .single();
+    if (error || !data) {
+      return { error: error?.message.includes("guest") ? "Falta rodar a atualização do banco (convidados) no Supabase." : "Não deu para pôr o convidado. Tente de novo." };
+    }
+    memberId = data.id as string;
+  }
+  await saveExempt(supabase, groupId, memberId, fd);
+  await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
+
+  const { data: current } = await supabase
+    .from("attendances")
+    .select("going")
+    .eq("game_id", gameId)
+    .eq("member_id", memberId)
+    .maybeSingle<{ going: boolean }>();
+  if (!current) await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true });
+  else if (!current.going) {
+    await supabase
+      .from("attendances")
+      .update({ going: true, confirmed_at: new Date().toISOString() })
+      .eq("game_id", gameId)
+      .eq("member_id", memberId);
+  }
+  refresh();
+  return { added: name };
+}
+
 async function gameAttendances(supabase: Client, gameId: string) {
   const { data } = await supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>();
   return data ?? [];

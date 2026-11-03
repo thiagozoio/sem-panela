@@ -118,6 +118,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         <div className="flex items-center justify-between gap-2">
           <span>
             {row.member.name}
+            {row.member.guest && <span className="text-neutral-400"> (convidado)</span>}
             {!row.member.active && <span className="text-neutral-400"> (fora do grupo)</span>}
           </span>
           {row.payment ? (

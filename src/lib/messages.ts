@@ -18,11 +18,11 @@ export function listMessage(
   lines.push(`*Confirmados (${confirmed.length}/${maxPlayers})*`);
   confirmed.forEach((e, i) => {
     const team = teamOf.get(e.member.id);
-    lines.push(`${i + 1}. ${e.member.name}${positionSuffix(sport, e.member.position)}${team ? ` · ${team}` : ""}`);
+    lines.push(`${i + 1}. ${e.member.name}${e.member.guest ? " (convidado)" : ""}${positionSuffix(sport, e.member.position)}${team ? ` · ${team}` : ""}`);
   });
   if (waitlist.length) {
     lines.push("", "*Lista de espera*");
-    waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}`));
+    waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}${e.member.guest ? " (convidado)" : ""}`));
   }
   if (out.length) {
     lines.push("", `*Não vão (${out.length})*`);

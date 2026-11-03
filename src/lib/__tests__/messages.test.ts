@@ -38,4 +38,11 @@ describe("listMessage", () => {
     const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [], 10, "https://x/g/1", "society");
     expect(msg).not.toContain("Não vão");
   });
+
+  it("marca o convidado na lista", () => {
+    const guest = { ...entry("g", "Pedro"), member: { ...entry("g", "Pedro").member, guest: true } };
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", [...confirmed, guest], [], [], 10, "https://x/g/1", "society");
+    expect(msg).toContain("4. Pedro (convidado)");
+    expect(msg).not.toContain("Ana (convidado)");
+  });
 });

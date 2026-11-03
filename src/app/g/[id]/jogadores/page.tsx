@@ -69,8 +69,9 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
 export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogadores">) {
   const { id } = await params;
   const { group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
-  const active = members.filter((m) => m.active);
-  const inactive = members.filter((m) => !m.active);
+  // Convidados de um jogo só não entram na lista de jogadores do grupo.
+  const active = members.filter((m) => m.active && !m.guest);
+  const inactive = members.filter((m) => !m.active && !m.guest);
   const canEdit = isOrganizer && !readOnly;
   const sport = sportOf(group.sport);
 
