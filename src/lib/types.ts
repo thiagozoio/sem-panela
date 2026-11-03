@@ -2,7 +2,8 @@ import type { Position, Sport } from "./sports";
 import type { RankingMode } from "./standings";
 
 export type { Position, Sport };
-export type MemberKind = "mensalista" | "avulso";
+/** Sócio: paga a mensalidade, mas não joga as peladas (antes da migração 20261103000000 não existe). */
+export type MemberKind = "mensalista" | "avulso" | "socio";
 
 export type Group = {
   id: string;

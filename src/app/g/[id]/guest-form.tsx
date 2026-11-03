@@ -12,12 +12,13 @@ export function GuestForm({
   groupId,
   gameId,
   positions,
-  singleFee,
+  teams,
 }: {
   groupId: string;
   gameId: string;
   positions: { value: string; label: string }[];
-  singleFee: string;
+  /** Times já montados no jogo (vazio = ainda não sorteou). */
+  teams: { name: string; count: number }[];
 }) {
   const [state, action] = useActionState(addGuest, {});
   return (
@@ -44,17 +45,23 @@ export function GuestForm({
             ))}
           </Select>
         </Field>
-        <div className="col-span-2">
-          <Field label="Pagamento">
-            <Select name="exempt" defaultValue="0">
-              <option value="0">Paga o avulso do jogo{singleFee ? ` (${singleFee})` : ""}</option>
-              <option value="1">Não paga (isento)</option>
-            </Select>
-          </Field>
-        </div>
+        {teams.length > 0 && (
+          <div className="col-span-2">
+            <Field label="Time" hint="Escolha o time que está faltando gente.">
+              <Select name="team" defaultValue="">
+                <option value="">O que tem menos gente</option>
+                {teams.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name} ({t.count})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        )}
       </div>
       <SubmitButton pendingText="Adicionando…">Adicionar convidado</SubmitButton>
-      {state.added && <p className="text-sm text-pitch-700">{state.added} entrou na lista ✅</p>}
+      {state.added && <p className="text-sm text-pitch-700">{state.added} ✅</p>}
       <ErrorText>{state.error}</ErrorText>
     </form>
   );

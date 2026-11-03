@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { paysMonthly } from "@/lib/members";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Button, Card, Input } from "@/components/ui";
@@ -64,7 +65,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
   const currentMonth = monthStart(todayInBrazil());
 
   const monthly: Row[] = members
-    .filter((m) => charging && m.active && !m.exempt && m.kind === "mensalista")
+    .filter((m) => charging && m.active && !m.exempt && paysMonthly(m))
     .map((m) => ({
       member: m,
       kind: "mensal",
@@ -81,7 +82,7 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       group.priority_hours,
     );
     const rows: Row[] = confirmed
-      .filter((e) => e.member.kind === "avulso" && !e.member.exempt)
+      .filter((e) => e.member.kind === "avulso" && !e.member.exempt && !e.member.guest)
       .map((e) => ({
         member: e.member,
         kind: "avulso",
@@ -118,7 +119,6 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
         <div className="flex items-center justify-between gap-2">
           <span>
             {row.member.name}
-            {row.member.guest && <span className="text-neutral-400"> (convidado)</span>}
             {!row.member.active && <span className="text-neutral-400"> (fora do grupo)</span>}
           </span>
           {row.payment ? (
@@ -295,13 +295,13 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
 
       <Card>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Mensalistas</h3>
+          <h3 className="font-semibold">Mensalidades</h3>
           <Badge>
             {monthly.filter((r) => r.payment).length}/{monthly.length} pagos
           </Badge>
         </div>
         {monthly.length === 0 ? (
-          <p className="pt-2 text-sm text-neutral-500">Nenhum mensalista. Marque em Jogadores.</p>
+          <p className="pt-2 text-sm text-neutral-500">Nenhum mensalista ou sócio. Marque em Jogadores.</p>
         ) : (
           <ul className="divide-y divide-neutral-100">
             {monthly.map((r) => (

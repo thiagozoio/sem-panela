@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { regularPlayer } from "@/lib/members";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { MonthNav } from "@/components/month-nav";
 import { SubmitButton } from "@/components/submit";
@@ -28,7 +29,7 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
 
   const byId = new Map(members.map((m) => [m.id, m]));
   const inTeam = new Set(teams.flatMap((t) => t.member_ids));
-  const withoutTeam = members.filter((m) => m.active && !m.guest && !inTeam.has(m.id));
+  const withoutTeam = members.filter((m) => regularPlayer(m) && !inTeam.has(m.id));
   const sport = sportOf(group.sport);
   const order = byPosition(sport);
   const tag = (m: Member) => {

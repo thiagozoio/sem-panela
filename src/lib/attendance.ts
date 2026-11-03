@@ -1,3 +1,4 @@
+import { plays } from "./members";
 import type { Attendance, Member } from "./types";
 
 export type ListEntry = { member: Member; confirmedAt: string; priority: boolean };
@@ -21,7 +22,7 @@ export function splitList(
   const out: Member[] = [];
   for (const a of attendances) {
     const member = byId.get(a.member_id);
-    if (!member || !member.active) continue;
+    if (!member || !member.active || !plays(member)) continue;
     if (!a.going) {
       out.push(member);
       continue;

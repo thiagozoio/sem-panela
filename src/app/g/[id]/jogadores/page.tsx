@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { KIND_LABEL } from "@/lib/members";
 import { Badge, Button, Card, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
@@ -51,6 +52,7 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
           <Select name="kind" defaultValue={member?.kind ?? "avulso"}>
             <option value="mensalista">Mensalista</option>
             <option value="avulso">Avulso (paga por jogo)</option>
+            <option value="socio">Sócio (só paga a mensalidade, não joga)</option>
           </Select>
         </Field>
       </div>
@@ -177,7 +179,7 @@ function PlayerSummary({ member, sport, showSkill }: { member: Member; sport: Sp
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="font-medium">{member.name}</span>
       {position && <Badge tone={position.value === "goleiro" ? "amber" : "neutral"}>{position.label.toLowerCase()}</Badge>}
-      <Badge tone={member.kind === "mensalista" ? "green" : "neutral"}>{member.kind}</Badge>
+      <Badge tone={member.kind === "avulso" ? "neutral" : "green"}>{KIND_LABEL[member.kind] ?? member.kind}</Badge>
       {member.exempt && <Badge tone="amber">isento</Badge>}
       {member.is_organizer && <Badge>organizador</Badge>}
       {!member.user_id && <Badge>sem conta</Badge>}

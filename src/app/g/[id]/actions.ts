@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
 import { drawTeams, type DrawPlayer } from "@/lib/draw";
 import { teamsFromFixed } from "@/lib/fixed-teams";
+import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
@@ -76,8 +77,8 @@ export async function clearAttendance(fd: FormData) {
 export type GuestState = { error?: string; added?: string };
 
 /**
- * Põe um convidado só neste jogo (quando faltar gente). Ele não entra em Jogadores nem na
- * mensalidade; paga o avulso do jogo, a não ser que venha marcado como isento.
+ * Põe um convidado só neste jogo (quando faltar gente). Ele não entra em Jogadores e não paga
+ * (fica isento). Se os times já estão montados, entra no time escolhido ou no que tem menos gente.
  * Se já veio como convidado antes com o mesmo nome, reaproveita (gols e notas ficam juntos).
  */
 export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestState> {
@@ -87,7 +88,7 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
   if (!name) return { error: "Escreva o nome do convidado." };
   const ctx = await getGroupContext(groupId);
   if (!ctx.isOrganizer || ctx.readOnly) return { error: "Só o organizador pode pôr convidados." };
-  const { supabase, members } = ctx;
+  const { supabase, members, group } = ctx;
   const value = str(fd, "position");
   const position: Position = ALL_POSITIONS.includes(value as Position) ? (value as Position) : "linha";
   const key = name.toLocaleLowerCase("pt-BR");
@@ -97,11 +98,11 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
 
   let memberId = members.find((m) => m.guest && m.name.toLocaleLowerCase("pt-BR") === key)?.id;
   if (memberId) {
-    await supabase.from("members").update({ position, active: true }).eq("id", memberId).eq("group_id", groupId);
+    await supabase.from("members").update({ position, active: true, exempt: true }).eq("id", memberId).eq("group_id", groupId);
   } else {
     const { data, error } = await supabase
       .from("members")
-      .insert({ group_id: groupId, name, position, kind: "avulso", guest: true })
+      .insert({ group_id: groupId, name, position, kind: "avulso", guest: true, exempt: true })
       .select("id")
       .single();
     if (error || !data) {
@@ -109,7 +110,6 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
     }
     memberId = data.id as string;
   }
-  await saveExempt(supabase, groupId, memberId, fd);
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
 
   const { data: current } = await supabase
@@ -126,8 +126,28 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
       .eq("game_id", gameId)
       .eq("member_id", memberId);
   }
+
+  // Times já montados no jogo: o convidado entra direto no time escolhido.
+  const team = str(fd, "team");
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  if (game?.teams?.length) {
+    const player = { member_id: memberId, name, position: positionOf(sportOf(group.sport), position) };
+    await supabase.from("games").update({ teams: addToTeam(game.teams, player, team) }).eq("id", gameId);
+  }
   refresh();
-  return { added: name };
+  return { added: team && game?.teams?.length ? `${name} entrou no ${team}` : `${name} entrou na lista` };
+}
+
+/** Tira o convidado da lista e do time deste jogo. */
+export async function removeGuest(fd: FormData) {
+  const gameId = str(fd, "game_id");
+  const memberId = str(fd, "member_id");
+  const supabase = await createClient();
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  if (game?.teams?.length) {
+    await supabase.from("games").update({ teams: removeFromTeams(game.teams, memberId) }).eq("id", gameId);
+  }
+  await clearAttendance(fd);
 }
 
 async function gameAttendances(supabase: Client, gameId: string) {
@@ -187,7 +207,13 @@ async function confirmedForGame(groupId: string, gameId: string) {
   if (!game) return null;
   const { confirmed } = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const sport = sportOf(group.sport);
-  return { supabase, game, userId: ctx.user.id, players: confirmed.map(({ member }) => toDrawPlayer(sport, member)) };
+  return {
+    supabase,
+    game,
+    userId: ctx.user.id,
+    players: confirmed.map(({ member }) => toDrawPlayer(sport, member)),
+    guestIds: new Set(confirmed.filter((e) => e.member.guest).map((e) => e.member.id)),
+  };
 }
 
 export async function drawTeamsAction(fd: FormData) {
@@ -214,7 +240,14 @@ export async function applyFixedTeams(fd: FormData) {
     .order("sort")
     .returns<FixedTeam[]>();
   if (!fixed?.length) return;
-  const { error } = await data.supabase.from("games").update({ teams: teamsFromFixed(fixed, data.players) }).eq("id", gameId);
+  // Convidado que já foi posto num time continua nele.
+  const guestTeam = new Map<string, string>();
+  for (const t of data.game.teams ?? []) for (const p of t.players) if (data.guestIds.has(p.member_id)) guestTeam.set(p.member_id, t.name);
+  const withGuests = fixed.map((t) => ({
+    ...t,
+    member_ids: [...t.member_ids, ...[...guestTeam].filter(([, name]) => name === t.name).map(([id]) => id)],
+  }));
+  const { error } = await data.supabase.from("games").update({ teams: teamsFromFixed(withGuests, data.players) }).eq("id", gameId);
   if (!error) after(() => notifyTeamsDrawn(groupId, gameId, data.userId));
   refresh();
 }
@@ -273,7 +306,8 @@ async function saveExempt(supabase: Client, groupId: string, memberId: string, f
 function memberFields(fd: FormData) {
   const value = str(fd, "position");
   const position: Position = ALL_POSITIONS.includes(value as Position) ? (value as Position) : "linha";
-  const kind: MemberKind = str(fd, "kind") === "mensalista" ? "mensalista" : "avulso";
+  const kindValue = str(fd, "kind");
+  const kind: MemberKind = kindValue === "mensalista" || kindValue === "socio" ? kindValue : "avulso";
   return { name: str(fd, "name").slice(0, 60), position, kind };
 }
 
