@@ -154,7 +154,7 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
         )}
         <ShareButtons
           label="Mandar lista no WhatsApp"
-          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, group.max_players, `${origin}/g/${group.id}`, sport, teamOf)}
+          text={listMessage(group.name, game.starts_at, list.confirmed, list.waitlist, list.out, group.max_players, `${origin}/g/${group.id}`, sport, teamOf)}
         />
       </Card>
 
