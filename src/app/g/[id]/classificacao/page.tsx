@@ -4,11 +4,15 @@ import { Button, Card, Field, Input, LinkButton } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { MonthNav } from "@/components/month-nav";
 import { ShareButtons } from "@/components/share";
-import { monthLabel, monthParam, monthStart } from "@/lib/format";
+import { addMonths, formatGameDate, monthLabel, monthParam, monthStart } from "@/lib/format";
 import {
   championshipPeriod,
   currentChampionship,
-  inChampionship,
+  decideChampion,
+  decidedByOf,
+  finalGameIds,
+  tableGames,
+  turnsOf,
   inMonth,
   leaders,
   monthlyTeamChampions,
@@ -17,7 +21,8 @@ import {
   topScorers,
   type Row,
 } from "@/lib/standings";
-import { createSeason, deleteChampionship } from "../actions";
+import { buildFinalTeams, createSeason, deleteChampionship } from "../actions";
+import { FinalForm } from "./final-form";
 import { ChampionshipForm } from "./championship-form";
 import { loadRanking } from "./data";
 import { Legend, StandingsTable } from "./standings-table";
@@ -30,7 +35,7 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const sp = await searchParams;
   const data = await loadRanking(id);
-  const { group, isOrganizer, readOnly, mode, sport, today, games, championships, fixedNames, nameOf } = data;
+  const { supabase, group, members, isOrganizer, readOnly, mode, sport, today, games, championships, fixedNames, nameOf } = data;
   const canEdit = isOrganizer && !readOnly;
   const base = `/g/${group.id}/classificacao`;
 
@@ -51,7 +56,8 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
   const month = monthParam(sp.mes);
   const selected =
     mode === "campeonato" ? (championships.find((c) => c.id === sp.c) ?? currentChampionship(championships, today)) : null;
-  const periodGames = mode === "mensal" ? inMonth(games, month) : selected ? inChampionship(games, selected) : [];
+  const finals = finalGameIds(championships);
+  const periodGames = mode === "mensal" ? inMonth(games, month) : selected ? tableGames(games, selected, finals) : [];
   const title = mode === "mensal" ? monthLabel(month) : selected ? `${selected.name} (${championshipPeriod(selected)})` : "";
   const finished = mode === "mensal" ? month < monthStart(today) : !!selected && selected.ends_on < today;
   const notStarted = mode === "campeonato" && !!selected && selected.starts_on > today;
@@ -64,6 +70,30 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
   const topTeams = leaders(table.teams);
   const scorers = topScorers(periodGames, (mid) => nameOf(mid)).slice(0, 10);
   const year = today.slice(0, 4);
+
+  // Campeonato decidido em jogo final ou à mão: o campeão não é o líder da tabela.
+  const decidedBy = decidedByOf(selected?.decided_by);
+  const finalGame = selected?.final_game_id ? games.find((g) => g.id === selected.final_game_id) : undefined;
+  const decision = selected ? decideChampion(selected, table.players, finalGame, today, nameOf) : null;
+
+  // Jogos que o organizador pode escolher como final: dos últimos meses e o próximo.
+  const { data: recentGames } =
+    mode === "campeonato" && canEdit
+      ? await supabase
+          .from("games")
+          .select("id, starts_at")
+          .eq("group_id", group.id)
+          .gte("starts_at", `${addMonths(today, -6)}T00:00:00-03:00`)
+          .order("starts_at", { ascending: false })
+          .limit(40)
+          .returns<{ id: string; starts_at: string }[]>()
+      : { data: [] as { id: string; starts_at: string }[] };
+  const gameOptions = (recentGames ?? []).map((g) => ({ id: g.id, label: formatGameDate(g.starts_at) }));
+  const playerOptions = members.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name }));
+  const finalDate = (c: { final_game_id?: string | null }) => {
+    const g = (recentGames ?? []).find((r) => r.id === c.final_game_id) ?? games.find((r) => r.id === c.final_game_id);
+    return g ? formatGameDate(g.starts_at) : null;
+  };
 
   return (
     <div className="space-y-4">
@@ -104,7 +134,29 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
               <h2 className="text-lg font-bold">{title}</h2>
             </div>
 
-            {topPlayers.length > 0 ? (
+            {decision && decidedBy !== "tabela" ? (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {decision.champions.length > 0 ? (
+                  <>
+                    🏆 Campeão{decidedBy === "final" ? " na final" : ""}: <strong>{names(decision.champions)}</strong>
+                  </>
+                ) : decision.pending === "empate" ? (
+                  "A final empatou. O organizador escolhe o campeão."
+                ) : decision.pending === "sem-placar" ? (
+                  `O campeão sai na final${finalDate(selected!) ? ` (${finalDate(selected!)})` : ""}.`
+                ) : decision.pending === "sem-jogo" ? (
+                  "O campeão sai num jogo final, que o organizador ainda vai marcar."
+                ) : (
+                  "O campeão vai ser escolhido pelo organizador."
+                )}
+                {decision.champions.length === 0 && topPlayers.length > 0 && (
+                  <>
+                    <br />
+                    Liderando a tabela: <strong>{names(topPlayers)}</strong>
+                  </>
+                )}
+              </p>
+            ) : topPlayers.length > 0 ? (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {finished ? "🏆 Campeão: " : "Liderando: "}
                 <strong>{names(topPlayers)}</strong>
@@ -200,6 +252,20 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
                     </summary>
                     <div className="mt-3 space-y-2">
                       <ChampionshipForm groupId={group.id} championship={c} />
+                      <FinalForm groupId={group.id} championship={c} games={gameOptions} players={playerOptions} />
+                      {decidedByOf(c.decided_by) === "final" && c.final_game_id && turnsOf(c, championships).length === 2 && (
+                        <form action={buildFinalTeams} className="space-y-1">
+                          <input type="hidden" name="group_id" value={group.id} />
+                          <input type="hidden" name="championship_id" value={c.id} />
+                          <SubmitButton variant="secondary" className="w-full" pendingText="Montando…">
+                            Montar os times da final: {turnsOf(c, championships).map((t) => t.name).join(" × ")}
+                          </SubmitButton>
+                          <p className="text-xs text-neutral-500">
+                            Os {group.players_per_team} melhores de cada turno. Quem está entre os melhores dos dois joga pelo 1º, e o
+                            2º time chama o próximo da tabela. Depois é só anotar o placar no jogo, como sempre.
+                          </p>
+                        </form>
+                      )}
                       <form action={deleteChampionship}>
                         <input type="hidden" name="group_id" value={group.id} />
                         <input type="hidden" name="championship_id" value={c.id} />

@@ -10,6 +10,9 @@ import {
   outcomes,
   points,
   rankingOf,
+  decideChampion,
+  finalTeamIds,
+  turnsOf,
   seasonChampionships,
   standings,
   standingsMessage,
@@ -189,5 +192,53 @@ describe("seasonChampionships", () => {
     expect(seasonChampionships(2027, "2026-12-31")).toBeNull();
     expect(seasonChampionships(2027, "2027-12-31")).toBeNull();
     expect(seasonChampionships(2027, "")).toBeNull();
+  });
+});
+
+describe("final e campeão à mão", () => {
+  const base = { group_id: "g", starts_on: "2026-01-01", ends_on: "2026-12-31" };
+  const final = { ...game("2026-12-20T23:00:00Z", ["1º turno", "2º turno"], [["a", "b"], ["c", "d"]], [1, 2]), id: "f" };
+  const regular = { ...game("2026-03-01T23:00:00Z", ["A", "B"], [["a", "b"], ["c", "d"]], [5, 0]), id: "r" };
+
+  it("na final, campeão é o time que venceu o jogo final", () => {
+    const c = { ...base, id: "anual", name: "Anual", decided_by: "final" as const, final_game_id: "f" };
+    expect(decideChampion(c, [], final, "2026-12-21", nameOf).champions.map((r) => r.key)).toEqual(["c", "d"]);
+    expect(decideChampion(c, [], undefined, "2026-12-21", nameOf).pending).toBe("sem-placar");
+    expect(decideChampion({ ...c, final_game_id: null }, [], undefined, "2026-12-21", nameOf).pending).toBe("sem-jogo");
+    const tie = { ...final, scores: [2, 2] };
+    expect(decideChampion(c, [], tie, "2026-12-21", nameOf).pending).toBe("empate");
+  });
+
+  it("jogo final não conta pontos e define o histórico", () => {
+    const list = [{ ...base, id: "anual", name: "Anual", decided_by: "final" as const, final_game_id: "f" }];
+    const [title] = championshipChampions(list, [regular, final], "2026-12-21", nameOf);
+    expect(title.players.map((r) => r.key)).toEqual(["c", "d"]);
+  });
+
+  it("à mão: quem o organizador marcou, mesmo antes do fim", () => {
+    const c = { ...base, id: "x", name: "Anual", decided_by: "manual" as const, champion_ids: ["b"] };
+    expect(decideChampion(c, [], undefined, "2026-06-01", nameOf).champions.map((r) => r.key)).toEqual(["b"]);
+    expect(decideChampion({ ...c, champion_ids: [] }, [], undefined, "2026-06-01", nameOf).pending).toBe("manual");
+  });
+
+  it("pela tabela: só depois que acaba", () => {
+    const c = { ...base, id: "x", name: "Anual" };
+    const { players } = standings([regular], nameOf);
+    expect(decideChampion(c, players, undefined, "2026-06-01", nameOf).pending).toBe("tabela");
+    expect(decideChampion(c, players, undefined, "2027-01-01", nameOf).champions.map((r) => r.key)).toEqual(["a", "b"]);
+  });
+
+  it("turnos dentro do anual e times da final sem repetir jogador", () => {
+    const list = [
+      { ...base, id: "anual", name: "Anual" },
+      { ...base, id: "t2", name: "2º turno", starts_on: "2026-07-01" },
+      { ...base, id: "t1", name: "1º turno", ends_on: "2026-06-30" },
+    ];
+    expect(turnsOf(list[0], list).map((t) => t.id)).toEqual(["t1", "t2"]);
+    const row = (key: string) => ({ key, name: key, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 });
+    expect(finalTeamIds(["a", "b", "c"].map(row), ["b", "d", "e", "f"].map(row), 2)).toEqual([
+      ["a", "b"],
+      ["d", "e"],
+    ]);
   });
 });

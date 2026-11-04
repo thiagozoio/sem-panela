@@ -12,7 +12,18 @@ import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
-import { rankingOf, seasonChampionships } from "@/lib/standings";
+import {
+  decidedByOf,
+  finalGameIds,
+  finalTeamIds,
+  rankingOf,
+  seasonChampionships,
+  standings,
+  tableGames,
+  turnsOf,
+  type Championship,
+  type ResultGame,
+} from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
@@ -570,6 +581,59 @@ export async function createSeason(fd: FormData) {
   const groupId = str(fd, "group_id");
   const supabase = await createClient();
   await supabase.from("championships").insert(list.map((c) => ({ group_id: groupId, ...c })));
+  refresh();
+}
+
+/** Como sai o campeão: decided_by, final_game_id e champion_ids (caixas marcadas). */
+export async function saveChampionshipFinal(_prev: ChampionshipState, fd: FormData): Promise<ChampionshipState> {
+  const decided_by = decidedByOf(str(fd, "decided_by"));
+  const finalGame = str(fd, "final_game_id");
+  const champion_ids = fd.getAll("champion_ids").map(String).filter(Boolean);
+  if (decided_by === "final" && !finalGame) return { error: "Escolha qual jogo vai ser a final." };
+  if (decided_by === "manual" && !champion_ids.length) return { error: "Marque quem é o campeão." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("championships")
+    .update({ decided_by, final_game_id: finalGame || null, champion_ids })
+    .eq("id", str(fd, "championship_id"))
+    .eq("group_id", str(fd, "group_id"));
+  if (error) return { error: "Não deu para salvar. Se ainda não rodou a atualização do banco da final, rode antes." };
+  refresh();
+  return { ok: true };
+}
+
+/** Põe no jogo final os melhores de cada turno: um time com os do 1º turno, outro com os do 2º. */
+export async function buildFinalTeams(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const { supabase, group, members, isOrganizer } = await getGroupContext(groupId);
+  if (!isOrganizer) return;
+  const [{ data: list }, { data: games }] = await Promise.all([
+    supabase.from("championships").select("*").eq("group_id", groupId).returns<Championship[]>(),
+    supabase
+      .from("games")
+      .select("id, starts_at, teams, scores")
+      .eq("group_id", groupId)
+      .not("scores", "is", null)
+      .returns<ResultGame[]>(),
+  ]);
+  const champ = (list ?? []).find((c) => c.id === str(fd, "championship_id"));
+  if (!champ?.final_game_id) return;
+  const turns = turnsOf(champ, list ?? []);
+  if (turns.length < 2) return;
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const nameOf = (id: string, fallback: string) => byId.get(id)?.name ?? fallback;
+  const finals = finalGameIds(list ?? []);
+  const [first, second] = turns.map((t) => standings(tableGames(games ?? [], t, finals), nameOf).players);
+  const ids = finalTeamIds(first, second, group.players_per_team);
+  const sport = sportOf(group.sport);
+  const teams = turns.map((t, i) => ({
+    name: t.name.slice(0, 30),
+    players: ids[i]
+      .map((id) => byId.get(id))
+      .filter((m): m is Member => !!m)
+      .map((m) => ({ member_id: m.id, name: m.name, position: positionOf(sport, m.position) })),
+  }));
+  await supabase.from("games").update({ teams }).eq("id", champ.final_game_id).eq("group_id", groupId);
   refresh();
 }
 
