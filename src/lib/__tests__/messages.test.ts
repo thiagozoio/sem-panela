@@ -29,6 +29,13 @@ describe("listMessage", () => {
     expect(msg).not.toContain("Branco");
   });
 
+  it("em cada time, o goleiro é o 1", () => {
+    const list = [entry("b", "Beto"), entry("c", "Caio"), entry("a", "Ana", "goleiro")];
+    const teamOf = teamNames([{ name: "Azul", member_ids: ["a", "b", "c"] }]);
+    const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", list, [], [], 10, "https://x/g/1", "society", teamOf);
+    expect(msg).toContain("*Azul (3)*\n1. Ana 🧤\n2. Beto\n3. Caio\n");
+  });
+
   it("mostra quem avisou que não vai", () => {
     const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [{ name: "Davi" }, { name: "Edu" }], 10, "https://x/g/1", "society");
     expect(msg).toContain("*Não vão (2)*\n❌ Davi\n❌ Edu");
