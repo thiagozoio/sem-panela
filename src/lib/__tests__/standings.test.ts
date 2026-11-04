@@ -6,6 +6,7 @@ import {
   inChampionship,
   leaders,
   monthlyChampions,
+  monthlyTeamChampions,
   outcomes,
   points,
   rankingOf,
@@ -149,5 +150,28 @@ describe("rankingOf e mensagem", () => {
     const text = standingsMessage("Pelada", "Outubro de 2026", players, [], "society");
     expect(text).toContain("1. A: *3 pts* (1J 1V 0E 0D, saldo +2)");
     expect(standingsMessage("Pelada", "x", players, [], "volei")).toContain("(1J 1V 0D, saldo +2)");
+  });
+});
+
+describe("times sorteados a cada mês", () => {
+  // "Time 1" de outubro e de novembro têm jogadores diferentes.
+  const games = [
+    game("2026-10-01T23:00:00Z", ["Time 1", "Time 2"], [["a", "b"], ["c", "d"]], [3, 0]),
+    game("2026-11-05T23:00:00Z", ["Time 1", "Time 2"], [["a", "c"], ["b", "d"]], [0, 2]),
+  ];
+  const fixed = () => new Set(["Time 1", "Time 2"]);
+
+  it("campeão de time por mês, sem somar meses", () => {
+    expect(monthlyTeamChampions(games, nameOf, fixed).map((t) => [t.month, t.teams.map((r) => r.name)])).toEqual([
+      ["2026-10-01", ["Time 1"]],
+      ["2026-11-01", ["Time 2"]],
+    ]);
+  });
+
+  it("campeonato encerrado não tem time campeão", () => {
+    const list = [{ id: "1", group_id: "g", name: "2º turno", starts_on: "2026-10-01", ends_on: "2026-11-30" }];
+    const [title] = championshipChampions(list, games, "2026-12-10", nameOf);
+    expect(title.teams).toEqual([]);
+    expect(title.players.map((r) => r.key)).toEqual(["b"]);
   });
 });

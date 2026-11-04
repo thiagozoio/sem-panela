@@ -10,6 +10,7 @@ import {
   inChampionship,
   inMonth,
   leaders,
+  monthlyTeamChampions,
   standings,
   standingsMessage,
   topScorers,
@@ -54,7 +55,10 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
   const finished = mode === "mensal" ? month < monthStart(today) : !!selected && selected.ends_on < today;
   const notStarted = mode === "campeonato" && !!selected && selected.starts_on > today;
 
-  const table = standings(periodGames, nameOf, fixedNames);
+  // Times fixos valem um mês: no campeonato a tabela é só de jogadores, mais o time campeão de cada mês.
+  const table = standings(periodGames, nameOf, mode === "mensal" ? fixedNames : undefined);
+  const teamMonths = mode === "campeonato" ? monthlyTeamChampions(periodGames, nameOf, fixedNames) : [];
+  const currentMonth = monthStart(today);
   const topPlayers = leaders(table.players);
   const topTeams = leaders(table.teams);
   const scorers = topScorers(periodGames, (mid) => nameOf(mid)).slice(0, 10);
@@ -131,6 +135,24 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
             <Card className="space-y-2">
               <h3 className="font-semibold">Times</h3>
               <StandingsTable rows={table.teams} sport={sport} label="Time" leaders={topTeams.length} />
+            </Card>
+          )}
+
+          {teamMonths.length > 0 && (
+            <Card className="space-y-2">
+              <h3 className="font-semibold">Time campeão de cada mês</h3>
+              <ul className="divide-y divide-neutral-100 text-sm">
+                {teamMonths.map((t) => (
+                  <li key={t.month} className="flex justify-between gap-2 py-1.5">
+                    <span>{t.label}</span>
+                    <span className="font-semibold">
+                      {t.month < currentMonth ? "🏆 " : ""}
+                      {names(t.teams)}
+                      {t.month >= currentMonth && <span className="font-normal text-neutral-500"> (liderando)</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
 

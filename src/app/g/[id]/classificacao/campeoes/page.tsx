@@ -12,7 +12,7 @@ export default async function ChampionsPage({ params }: PageProps<"/g/[id]/class
 
   const titles: Title[] =
     mode === "campeonato"
-      ? championshipChampions(championships, games, today, nameOf, fixedNames)
+      ? championshipChampions(championships, games, today, nameOf)
       : mode === "mensal"
         ? monthlyChampions(games, today, nameOf, fixedNames)
         : [];
