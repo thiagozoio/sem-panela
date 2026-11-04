@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { KIND_LABEL } from "@/lib/members";
 import { Badge, Button, Card, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
@@ -20,7 +21,7 @@ const SKILLS = [
   [5, "5 · Craque"],
 ] as const;
 
-function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
+function MemberFields({ member, sport, isNew = false }: { member?: Member; sport: Sport; isNew?: boolean }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2">
@@ -53,6 +54,7 @@ function MemberFields({ member, sport }: { member?: Member; sport: Sport }) {
             <option value="mensalista">Mensalista</option>
             <option value="avulso">Avulso (paga por jogo)</option>
             <option value="socio">Sócio (só paga a mensalidade, não joga)</option>
+            {isNew && <option value="convidado">Convidado (só o próximo jogo, não paga)</option>}
           </Select>
         </Field>
       </div>
@@ -137,13 +139,21 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
       {canEdit && (
         <Card>
           <details>
-            <summary className="cursor-pointer font-semibold">+ Cadastrar jogador</summary>
+            <summary className="cursor-pointer font-semibold">+ Cadastrar jogador ou convidado</summary>
+            <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              É só para um jogo, porque vai faltar gente? Escolha o tipo <b>Convidado</b> abaixo ou use “Adicionar convidado”
+              na aba{" "}
+              <Link href={`/g/${group.id}`} className="font-semibold underline">
+                Jogo
+              </Link>
+              . Convidado não vira jogador do grupo e não paga.
+            </p>
             <p className="mt-2 text-sm text-neutral-600">
               Para quem ainda não entrou pelo link. Depois é só abrir o jogador e tocar em “Enviar acesso pelo WhatsApp”: ele entra sem e-mail. Quem preferir pode entrar pelo convite e escolher o próprio nome.
             </p>
             <form action={addMember} className="mt-3 space-y-3">
               <input type="hidden" name="group_id" value={group.id} />
-              <MemberFields sport={sport} />
+              <MemberFields sport={sport} isNew />
               <SubmitButton className="w-full">Cadastrar</SubmitButton>
             </form>
           </details>

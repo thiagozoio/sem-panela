@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getGroupContext } from "@/lib/groups";
 import { createClient } from "@/lib/supabase/server";
@@ -355,6 +356,15 @@ async function savePhone(supabase: Client, groupId: string, memberId: string, ph
 export async function addMember(fd: FormData) {
   const groupId = str(fd, "group_id");
   const supabase = await createClient();
+  // "Convidado" escolhido em Jogadores: vai como convidado do próximo jogo, não como jogador do grupo.
+  if (str(fd, "kind") === "convidado") {
+    const { data: gameId } = await supabase.rpc("ensure_next_game", { p_group_id: groupId });
+    if (typeof gameId !== "string") return;
+    fd.set("game_id", gameId);
+    const result = await addGuest({}, fd);
+    if (result.error) return;
+    redirect(`/g/${groupId}?convidado=${encodeURIComponent(str(fd, "name").slice(0, 60))}`);
+  }
   const fields = memberFields(fd);
   if (!fields.name) return;
   const { data } = await supabase.from("members").insert({ group_id: groupId, ...fields }).select("id").single();

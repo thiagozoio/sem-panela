@@ -18,8 +18,9 @@ import { GuestForm } from "./guest-form";
 import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, removeGuest, setAttendance } from "./actions";
 import { plays, regularPlayer } from "@/lib/members";
 
-export default async function GamePage({ params }: PageProps<"/g/[id]">) {
+export default async function GamePage({ params, searchParams }: PageProps<"/g/[id]">) {
   const { id } = await params;
+  const added = (await searchParams).convidado;
   const supabase = await createClient();
   // O próximo jogo é garantido em paralelo com o carregamento do grupo.
   const [{ group, members, me, isOrganizer, readOnly }, { data: gameId }] = await Promise.all([
@@ -86,6 +87,11 @@ export default async function GamePage({ params }: PageProps<"/g/[id]">) {
 
   return (
     <div className="space-y-4">
+      {typeof added === "string" && added && (
+        <p className="rounded-xl bg-pitch-50 px-3 py-2 text-sm text-pitch-900">
+          {added} entrou como convidado neste jogo ✅
+        </p>
+      )}
       <Card className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
