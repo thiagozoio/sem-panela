@@ -166,20 +166,32 @@ export function monthlyChampions(games: ResultGame[], today: string, nameOf: Par
   });
 }
 
+/** Time campeão de cada mês dos jogos dados, do mais antigo ao mais recente (só meses com times fixos). */
+export function monthlyTeamChampions(
+  games: ResultGame[],
+  nameOf: Parameters<typeof standings>[1],
+  fixedNames: Parameters<typeof standings>[2],
+): { month: string; label: string; teams: Row[] }[] {
+  const months = [...new Set(games.filter(hasResult).map((g) => monthOf(g.starts_at)))].sort();
+  return months
+    .map((m) => ({ month: m, label: monthLabel(m), teams: leaders(standings(inMonth(games, m), nameOf, fixedNames).teams) }))
+    .filter((t) => t.teams.length > 0);
+}
+
 /** Campeões dos campeonatos que já acabaram (com algum jogo), do mais recente para o mais antigo. */
 export function championshipChampions(
   list: Championship[],
   games: ResultGame[],
   today: string,
   nameOf: Parameters<typeof standings>[1],
-  fixedNames?: Parameters<typeof standings>[2],
 ): Title[] {
   return list
     .filter((c) => c.ends_on < today)
     .sort((a, b) => b.ends_on.localeCompare(a.ends_on))
     .map((c) => {
-      const t = standings(inChampionship(games, c), nameOf, fixedNames);
-      return { key: c.id, label: c.name, players: leaders(t.players), teams: leaders(t.teams) };
+      // Times fixos são sorteados de novo a cada mês: num campeonato só os jogadores somam.
+      const t = standings(inChampionship(games, c), nameOf);
+      return { key: c.id, label: c.name, players: leaders(t.players), teams: [] };
     })
     .filter((t) => t.players.length > 0);
 }
