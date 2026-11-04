@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Button, Card, LinkButton } from "@/components/ui";
+import { Button, Card, Field, Input, LinkButton } from "@/components/ui";
+import { SubmitButton } from "@/components/submit";
 import { MonthNav } from "@/components/month-nav";
 import { ShareButtons } from "@/components/share";
 import { monthLabel, monthParam, monthStart } from "@/lib/format";
@@ -16,7 +17,7 @@ import {
   topScorers,
   type Row,
 } from "@/lib/standings";
-import { deleteChampionship } from "../actions";
+import { createSeason, deleteChampionship } from "../actions";
 import { ChampionshipForm } from "./championship-form";
 import { loadRanking } from "./data";
 import { Legend, StandingsTable } from "./standings-table";
@@ -213,7 +214,28 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
             </ul>
           )}
           <details open={championships.length === 0}>
-            <summary className="cursor-pointer text-sm font-semibold text-pitch-700">+ Novo campeonato</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-pitch-700">+ Temporada inteira (1º turno, 2º turno e anual)</summary>
+            <form action={createSeason} className="mt-3 space-y-3">
+              <input type="hidden" name="group_id" value={group.id} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Ano">
+                  <Input name="year" type="number" min={2000} max={2100} defaultValue={year} required />
+                </Field>
+                <Field label="1º turno termina em">
+                  <Input name="first_ends" type="date" defaultValue={`${year}-06-30`} required />
+                </Field>
+              </div>
+              <p className="text-xs text-neutral-500">
+                O 2º turno começa no dia seguinte e vai até 31/12. O anual soma o ano inteiro. Dá para mudar as datas de cada um
+                depois, tocando no nome dele.
+              </p>
+              <SubmitButton className="w-full" pendingText="Criando…">
+                Criar os três campeonatos
+              </SubmitButton>
+            </form>
+          </details>
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold text-pitch-700">+ Um campeonato só</summary>
             <div className="mt-3">
               <ChampionshipForm
                 groupId={group.id}

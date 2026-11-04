@@ -10,6 +10,7 @@ import {
   outcomes,
   points,
   rankingOf,
+  seasonChampionships,
   standings,
   standingsMessage,
   topScorers,
@@ -173,5 +174,20 @@ describe("times sorteados a cada mês", () => {
     const [title] = championshipChampions(list, games, "2026-12-10", nameOf);
     expect(title.teams).toEqual([]);
     expect(title.players.map((r) => r.key)).toEqual(["b"]);
+  });
+});
+
+describe("seasonChampionships", () => {
+  it("1º turno, 2º turno no dia seguinte e anual", () => {
+    expect(seasonChampionships(2027, "2027-06-30")).toEqual([
+      { name: "1º turno 2027", starts_on: "2027-01-01", ends_on: "2027-06-30" },
+      { name: "2º turno 2027", starts_on: "2027-07-01", ends_on: "2027-12-31" },
+      { name: "Anual 2027", starts_on: "2027-01-01", ends_on: "2027-12-31" },
+    ]);
+  });
+  it("fim do 1º turno fora do ano não cria nada", () => {
+    expect(seasonChampionships(2027, "2026-12-31")).toBeNull();
+    expect(seasonChampionships(2027, "2027-12-31")).toBeNull();
+    expect(seasonChampionships(2027, "")).toBeNull();
   });
 });

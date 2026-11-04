@@ -150,6 +150,24 @@ export function currentChampionship<C extends Championship>(list: C[], today: st
   return started.find((c) => c.ends_on >= today) ?? started[0] ?? [...list].sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0] ?? null;
 }
 
+/**
+ * Temporada inteira de uma vez: 1º turno do começo do ano até `firstEnds`,
+ * 2º turno do dia seguinte até o fim do ano e o anual, que soma os dois.
+ * Devolve null se `firstEnds` não estiver dentro do ano (sobraria um turno vazio).
+ */
+export function seasonChampionships(year: number, firstEnds: string) {
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstEnds) || firstEnds < start || firstEnds >= end) return null;
+  const next = new Date(`${firstEnds}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return [
+    { name: `1º turno ${year}`, starts_on: start, ends_on: firstEnds },
+    { name: `2º turno ${year}`, starts_on: next.toISOString().slice(0, 10), ends_on: end },
+    { name: `Anual ${year}`, starts_on: start, ends_on: end },
+  ];
+}
+
 export function championshipPeriod(c: Pick<Championship, "starts_on" | "ends_on">): string {
   return `${formatDay(c.starts_on)} a ${formatDay(c.ends_on)}`;
 }

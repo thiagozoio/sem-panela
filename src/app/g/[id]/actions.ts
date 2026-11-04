@@ -12,7 +12,7 @@ import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
-import { rankingOf } from "@/lib/standings";
+import { rankingOf, seasonChampionships } from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
@@ -560,6 +560,17 @@ export async function saveChampionship(_prev: ChampionshipState, fd: FormData): 
   }
   refresh();
   return { ok: true };
+}
+
+/** Cria 1º turno, 2º turno e anual do ano escolhido. */
+export async function createSeason(fd: FormData) {
+  const year = clampInt(str(fd, "year"), 2000, 2100, new Date().getFullYear());
+  const list = seasonChampionships(year, str(fd, "first_ends"));
+  if (!list) return;
+  const groupId = str(fd, "group_id");
+  const supabase = await createClient();
+  await supabase.from("championships").insert(list.map((c) => ({ group_id: groupId, ...c })));
+  refresh();
 }
 
 export async function deleteChampionship(fd: FormData) {
