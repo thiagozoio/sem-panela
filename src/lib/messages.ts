@@ -16,10 +16,31 @@ export function listMessage(
 ): string {
   const lines = [`${sport === "volei" ? "🏐" : "⚽"} *${groupName}*`, formatGameDate(startsAt), ""];
   lines.push(`*Confirmados (${confirmed.length}/${maxPlayers})*`);
-  confirmed.forEach((e, i) => {
-    const team = teamOf.get(e.member.id);
-    lines.push(`${i + 1}. ${e.member.name}${e.member.guest ? " (convidado)" : ""}${positionSuffix(sport, e.member.position)}${team ? ` · ${team}` : ""}`);
-  });
+  const line = (e: ListEntry, i: number) =>
+    `${i + 1}. ${e.member.name}${e.member.guest ? " (convidado)" : ""}${positionSuffix(sport, e.member.position)}`;
+  if (confirmed.some((e) => teamOf.has(e.member.id))) {
+    // Com times (do jogo ou fixos do mês), os confirmados saem separados por time,
+    // na ordem dos times; quem ainda não tem time vai no fim.
+    const groups = new Map<string, ListEntry[]>();
+    for (const name of teamOf.values()) if (!groups.has(name)) groups.set(name, []);
+    const noTeam: ListEntry[] = [];
+    for (const e of confirmed) {
+      const team = teamOf.get(e.member.id);
+      if (team) groups.get(team)!.push(e);
+      else noTeam.push(e);
+    }
+    for (const [name, entries] of groups) {
+      if (!entries.length) continue;
+      lines.push("", `*${name} (${entries.length})*`);
+      entries.forEach((e, i) => lines.push(line(e, i)));
+    }
+    if (noTeam.length) {
+      lines.push("", `*Sem time (${noTeam.length})*`);
+      noTeam.forEach((e, i) => lines.push(line(e, i)));
+    }
+  } else {
+    confirmed.forEach((e, i) => lines.push(line(e, i)));
+  }
   if (waitlist.length) {
     lines.push("", "*Lista de espera*");
     waitlist.forEach((e, i) => lines.push(`${i + 1}. ${e.member.name}${e.member.guest ? " (convidado)" : ""}`));

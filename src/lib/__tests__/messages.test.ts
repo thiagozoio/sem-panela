@@ -18,16 +18,15 @@ describe("listMessage", () => {
     expect(msg).not.toContain("·");
   });
 
-  it("com times, mostra o time de cada jogador", () => {
+  it("com times, separa os confirmados por time e deixa quem não tem time no fim", () => {
     const teamOf = teamNames([
-      { name: "Azul", member_ids: ["a", "b"] },
-      { name: "Branco", member_ids: ["x"] },
+      { name: "Azul", member_ids: ["b", "x"] },
+      { name: "Amarelo", member_ids: ["a"] },
+      { name: "Branco", member_ids: ["y"] },
     ]);
     const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", confirmed, [], [], 10, "https://x/g/1", "society", teamOf);
-    expect(msg).toContain("1. Ana 🧤 · Azul");
-    expect(msg).toContain("2. Beto");
-    expect(msg).toMatch(/2\. Beto.* · Azul/);
-    expect(msg).toMatch(/3\. Caio[^\n·]*\n/);
+    expect(msg).toContain("*Confirmados (3/10)*\n\n*Azul (1)*\n1. Beto\n\n*Amarelo (1)*\n1. Ana 🧤\n\n*Sem time (1)*\n1. Caio\n");
+    expect(msg).not.toContain("Branco");
   });
 
   it("mostra quem avisou que não vai", () => {
