@@ -29,7 +29,13 @@ export function listMessage(
       if (team) groups.get(team)!.push(e);
       else noTeam.push(e);
     }
-    for (const [name, entries] of groups) {
+    // Em cada time o goleiro vem primeiro; o resto segue a ordem de confirmação.
+    const keeperFirst = (entries: ListEntry[]) =>
+      sport === "volei"
+        ? entries
+        : [...entries.filter((e) => e.member.position === "goleiro"), ...entries.filter((e) => e.member.position !== "goleiro")];
+    for (const [name, all] of groups) {
+      const entries = keeperFirst(all);
       if (!entries.length) continue;
       lines.push("", `*${name} (${entries.length})*`);
       entries.forEach((e, i) => lines.push(line(e, i)));
