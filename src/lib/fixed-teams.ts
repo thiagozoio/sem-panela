@@ -1,5 +1,14 @@
 import type { DrawPlayer } from "./draw";
-import type { FixedTeam, Team } from "./types";
+import { positionOf, type Sport } from "./sports";
+import type { FixedTeam, Member, Team } from "./types";
+
+/** Jogador no formato do sorteio (posição já ajustada para a modalidade). */
+export const toDrawPlayer = (sport: Sport, member: Member): DrawPlayer => ({
+  member_id: member.id,
+  name: member.name,
+  position: positionOf(sport, member.position),
+  skill: member.skill,
+});
 
 type Slot = { name: string; players: DrawPlayer[]; total: number };
 

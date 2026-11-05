@@ -6,9 +6,11 @@ import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
-import { formatGameDate, hasStarted } from "@/lib/format";
+import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
+import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
+import { sportOf } from "@/lib/sports";
 import { bestPlayer, rankRatings, resultMessage, scorers } from "@/lib/result";
-import type { Attendance, Game, GameGoal, Member, RatingSummary } from "@/lib/types";
+import type { Attendance, FixedTeam, Game, GameGoal, Member, RatingSummary } from "@/lib/types";
 import { saveRatings, saveResult } from "../../actions";
 
 export const metadata: Metadata = { title: "Resultado" };
@@ -52,6 +54,25 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
+
+  // Jogo sem times salvos (não teve sorteio): se o mês tem times fixos, o placar
+  // é anotado com eles, e ao salvar eles viram os times do jogo.
+  let fixedTeams: Game["teams"] = null;
+  if (canEditResult && started && !game.teams) {
+    const { data: fixed } = await supabase
+      .from("fixed_teams")
+      .select("name, member_ids")
+      .eq("group_id", group.id)
+      .eq("month", monthOf(game.starts_at))
+      .order("sort")
+      .returns<Pick<FixedTeam, "name" | "member_ids">[]>();
+    if (fixed?.length) {
+      const sport = sportOf(group.sport);
+      const teams = teamsFromFixed(fixed, played.map((m) => toDrawPlayer(sport, m)));
+      if (teams.length >= 2) fixedTeams = teams;
+    }
+  }
+  const scoreTeams = game.teams ?? fixedTeams;
 
   return (
     <div className="space-y-4">
@@ -116,9 +137,16 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
             <summary className="cursor-pointer font-semibold">{hasResult ? "Corrigir placar e gols" : "Anotar placar e gols"}</summary>
             <form action={saveResult} className="mt-3 space-y-4">
               <input type="hidden" name="game_id" value={game.id} />
-              {game.teams && (
+              <input type="hidden" name="group_id" value={group.id} />
+              {!game.teams && fixedTeams && <input type="hidden" name="use_fixed" value="1" />}
+              {!scoreTeams && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Esse jogo ficou sem times (não teve sorteio), então não tem placar. Dá para anotar os gols de cada jogador.
+                </p>
+              )}
+              {scoreTeams && (
                 <div className="flex flex-wrap gap-3">
-                  {game.teams.map((t, i) => (
+                  {scoreTeams.map((t, i) => (
                     <label key={t.name} className="text-sm">
                       <span className="block text-neutral-600">{t.name}</span>
                       <Input name={`score_${i}`} type="number" min={0} max={99} defaultValue={game.scores?.[i] ?? 0} className="w-20" />

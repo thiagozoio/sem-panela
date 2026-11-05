@@ -6,11 +6,11 @@ import { after } from "next/server";
 import { getGroupContext } from "@/lib/groups";
 import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
-import { drawTeams, type DrawPlayer } from "@/lib/draw";
-import { teamsFromFixed } from "@/lib/fixed-teams";
+import { drawTeams } from "@/lib/draw";
+import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
-import { ALL_POSITIONS, positionOf, sportOf, type Sport } from "@/lib/sports";
+import { ALL_POSITIONS, positionOf, sportOf } from "@/lib/sports";
 import { brazilDateTime } from "@/lib/matches";
 import {
   decidedByOf,
@@ -226,13 +226,6 @@ export async function pushMessage(_prev: PushState, fd: FormData): Promise<PushS
 // Sorteio
 // ---------------------------------------------------------------------------
 
-const toDrawPlayer = (sport: Sport, member: Member): DrawPlayer => ({
-  member_id: member.id,
-  name: member.name,
-  position: positionOf(sport, member.position),
-  skill: member.skill,
-});
-
 async function confirmedForGame(groupId: string, gameId: string) {
   const ctx = await getGroupContext(groupId);
   if (!ctx.isOrganizer) return null;
@@ -263,12 +256,8 @@ export async function drawTeamsAction(fd: FormData) {
   refresh();
 }
 
-/** Monta os times do jogo com os times fixos do mês. */
-export async function applyFixedTeams(fd: FormData) {
-  const groupId = str(fd, "group_id");
-  const gameId = str(fd, "game_id");
-  const data = await confirmedForGame(groupId, gameId);
-  if (!data) return;
+/** Times do jogo montados com os times fixos do mês (null se o mês não tem times fixos). */
+async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<ReturnType<typeof confirmedForGame>>>) {
   const { data: fixed } = await data.supabase
     .from("fixed_teams")
     .select("*")
@@ -276,7 +265,7 @@ export async function applyFixedTeams(fd: FormData) {
     .eq("month", monthOf(data.game.starts_at))
     .order("sort")
     .returns<FixedTeam[]>();
-  if (!fixed?.length) return;
+  if (!fixed?.length) return null;
   // Convidado que já foi posto num time continua nele.
   const guestTeam = new Map<string, string>();
   for (const t of data.game.teams ?? []) for (const p of t.players) if (data.guestIds.has(p.member_id)) guestTeam.set(p.member_id, t.name);
@@ -284,7 +273,18 @@ export async function applyFixedTeams(fd: FormData) {
     ...t,
     member_ids: [...t.member_ids, ...[...guestTeam].filter(([, name]) => name === t.name).map(([id]) => id)],
   }));
-  const { error } = await data.supabase.from("games").update({ teams: teamsFromFixed(withGuests, data.players) }).eq("id", gameId);
+  return teamsFromFixed(withGuests, data.players);
+}
+
+/** Monta os times do jogo com os times fixos do mês. */
+export async function applyFixedTeams(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const data = await confirmedForGame(groupId, gameId);
+  if (!data) return;
+  const teams = await fixedTeamsForGame(groupId, data);
+  if (!teams) return;
+  const { error } = await data.supabase.from("games").update({ teams }).eq("id", gameId);
   if (!error) after(() => notifyTeamsDrawn(groupId, gameId, data.userId));
   refresh();
 }
@@ -309,7 +309,24 @@ export async function saveResult(fd: FormData) {
     .filter((k) => k.startsWith("goals_"))
     .map((k) => ({ game_id: gameId, member_id: k.slice(6), goals: clampInt(str(fd, k), 0, 50, 0) }));
 
-  const { error } = await supabase.from("games").update({ scores: scores.length ? scores : null }).eq("id", gameId);
+  // Jogo sem times salvos, mas com times fixos no mês: o placar é dos times fixos,
+  // então eles passam a ser os times do jogo (sem avisar ninguém, o jogo já foi).
+  let teamsUpdate = {};
+  if (scores.length && fd.get("use_fixed") === "1") {
+    const groupId = str(fd, "group_id");
+    const data = await confirmedForGame(groupId, gameId);
+    if (!data) return;
+    if (!data.game.teams) {
+      const teams = await fixedTeamsForGame(groupId, data);
+      if (!teams || teams.length !== scores.length) return;
+      teamsUpdate = { teams };
+    }
+  }
+
+  const { error } = await supabase
+    .from("games")
+    .update({ scores: scores.length ? scores : null, ...teamsUpdate })
+    .eq("id", gameId);
   if (error) return;
   await supabase.from("game_goals").delete().eq("game_id", gameId);
   const scored = goals.filter((g) => g.goals > 0);
