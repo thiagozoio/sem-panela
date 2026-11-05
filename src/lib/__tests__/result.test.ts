@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestPlayer, resultMessage, scorers } from "../result";
+import { bestPlayer, mvpWinners, resultMessage, scorers } from "../result";
 
 describe("bestPlayer", () => {
   it("pega a maior média com pelo menos 2 votos", () => {
@@ -41,5 +41,28 @@ describe("resultMessage", () => {
     expect(text).toContain("⚽ Pedro (2)");
     expect(text).toContain("⚽ Zé\n");
     expect(text).toContain("Craque do jogo: *Pedro*");
+  });
+});
+
+describe("mvpWinners", () => {
+  it("pega o mais votado", () => {
+    const w = mvpWinners([
+      { member_id: "a", votes: 2 },
+      { member_id: "b", votes: 5 },
+    ]);
+    expect(w.map((v) => v.member_id)).toEqual(["b"]);
+  });
+
+  it("no empate, todos os empatados", () => {
+    const w = mvpWinners([
+      { member_id: "a", votes: 3 },
+      { member_id: "b", votes: 3 },
+      { member_id: "c", votes: 1 },
+    ]);
+    expect(w.map((v) => v.member_id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("sem votos, ninguém", () => {
+    expect(mvpWinners([])).toEqual([]);
   });
 });

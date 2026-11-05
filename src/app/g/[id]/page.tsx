@@ -156,7 +156,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
               ? ` · ${lastGame.teams.map((t, i) => `${t.name} ${lastGame.scores?.[i] ?? 0}`).join(" × ")}`
               : ""}
           </span>
-          <span className="whitespace-nowrap font-semibold text-pitch-700">Placar e notas ›</span>
+          <span className="whitespace-nowrap font-semibold text-pitch-700">Placar e craque ›</span>
         </Link>
       )}
 

@@ -347,6 +347,19 @@ export async function saveRatings(fd: FormData) {
   refresh();
 }
 
+/** Voto do jogador logado no craque do jogo; campo "voted_id" (vazio = tira o voto). */
+export async function saveMvpVote(fd: FormData) {
+  const gameId = str(fd, "game_id");
+  const voterId = str(fd, "voter_id");
+  const votedId = str(fd, "voted_id");
+  const supabase = await createClient();
+  await supabase.from("game_mvp_votes").delete().eq("game_id", gameId).eq("voter_id", voterId);
+  if (votedId && votedId !== voterId) {
+    await supabase.from("game_mvp_votes").insert({ game_id: gameId, voter_id: voterId, voted_id: votedId });
+  }
+  refresh();
+}
+
 // ---------------------------------------------------------------------------
 // Jogadores
 // ---------------------------------------------------------------------------
