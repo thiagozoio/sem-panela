@@ -37,6 +37,17 @@ export function scorers(goals: GameGoal[], nameOf: (memberId: string) => string)
     .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, "pt-BR"));
 }
 
+/** Gols contra de cada jogador (só quem tem), mais gols primeiro. */
+export function ownGoalScorers(goals: GameGoal[], nameOf: (memberId: string) => string) {
+  return scorers(
+    goals.map((g) => ({ ...g, goals: g.own_goals ?? 0 })),
+    nameOf,
+  );
+}
+
+const ownLabel = (n: number) => (n > 1 ? `(${n} contra)` : "(contra)");
+export { ownLabel as ownGoalLabel };
+
 export function resultMessage(
   groupName: string,
   startsAt: string,
@@ -44,13 +55,19 @@ export function resultMessage(
   scores: number[] | null,
   goalList: { name: string; goals: number }[],
   best: string | null,
+  ownGoalList: { name: string; goals: number }[] = [],
 ): string {
   const lines = [`⚽ *${groupName}*: resultado`, formatGameDate(startsAt)];
   if (teams && scores?.length) {
     lines.push("", ...teams.map((t, i) => `*${t.name}* ${scores[i] ?? 0}`));
   }
-  if (goalList.length) {
-    lines.push("", "*Gols*", ...goalList.map((g) => `⚽ ${g.name}${g.goals > 1 ? ` (${g.goals})` : ""}`));
+  if (goalList.length || ownGoalList.length) {
+    lines.push(
+      "",
+      "*Gols*",
+      ...goalList.map((g) => `⚽ ${g.name}${g.goals > 1 ? ` (${g.goals})` : ""}`),
+      ...ownGoalList.map((g) => `⚽ ${g.name} ${ownLabel(g.goals)}`),
+    );
   }
   if (best) lines.push("", `⭐ Craque do jogo: *${best}*`);
   return lines.join("\n");
