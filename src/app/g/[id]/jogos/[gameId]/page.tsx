@@ -9,9 +9,9 @@ import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { sportOf } from "@/lib/sports";
-import { bestPlayer, rankRatings, resultMessage, scorers } from "@/lib/result";
-import type { Attendance, FixedTeam, Game, GameGoal, Member, RatingSummary } from "@/lib/types";
-import { saveLineup, saveRatings, saveResult } from "../../actions";
+import { bestPlayer, mvpWinners, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
+import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
+import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
 
 export const metadata: Metadata = { title: "Resultado" };
 
@@ -21,7 +21,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const { id, gameId } = await params;
   const { supabase, group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
 
-  const [{ data: gameRow }, { data: goals }, { data: summary }, { data: myRatings }] = await Promise.all([
+  const [{ data: gameRow }, { data: goals }, { data: summary }, { data: myRatings }, { data: mvpRows }, { data: myVoteRow }] = await Promise.all([
     supabase
       .from("games")
       .select("*, attendances(*)")
@@ -33,6 +33,11 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
     me
       ? supabase.from("game_ratings").select("rated_id, rating").eq("game_id", gameId).eq("rater_id", me.id)
       : Promise.resolve({ data: [] as { rated_id: string; rating: number }[] }),
+    // Sem a migração 20261105000000 essas duas dão erro e a votação some.
+    supabase.rpc("game_mvp_summary", { p_game_id: gameId }),
+    me
+      ? supabase.from("game_mvp_votes").select("voted_id").eq("game_id", gameId).eq("voter_id", me.id).maybeSingle<{ voted_id: string }>()
+      : Promise.resolve({ data: null }),
   ]);
   if (!gameRow) notFound();
   const { attendances, ...game } = gameRow;
@@ -51,7 +56,23 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const goalList = scorers(goals ?? [], nameOf);
   const playedIds = new Set(played.map((m) => m.id));
   const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => playedIds.has(r.member_id)));
-  const best = bestPlayer(ranking);
+  const mvpVotes = rankMvpVotes(((mvpRows ?? []) as MvpSummary[]).filter((v) => playedIds.has(v.member_id)));
+  const mvpOn = mvpRows !== null; // a votação existe no banco
+  const totalMvpVotes = mvpVotes.reduce((n, v) => n + v.votes, 0);
+  const myVote = myVoteRow?.voted_id ?? "";
+
+  // Craque do jogo: o mais votado pelos jogadores (empate = todos os empatados).
+  // Sem nenhum voto, continua valendo a maior média das notas.
+  const winners = mvpWinners(mvpVotes);
+  const best = winners.length ? null : bestPlayer(ranking);
+  const craque = winners.length
+    ? {
+        name: winners.map((w) => nameOf(w.member_id)).join(" e "),
+        detail: `${winners[0].votes} ${winners[0].votes === 1 ? "voto" : "votos"}`,
+      }
+    : best
+      ? { name: nameOf(best.member_id), detail: `nota ${Number(best.average).toFixed(1).replace(".", ",")}` }
+      : null;
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
@@ -130,16 +151,16 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           </div>
         )}
 
-        {best && (
+        {craque && (
           <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            ⭐ Craque do jogo: <strong>{nameOf(best.member_id)}</strong> (nota {Number(best.average).toFixed(1).replace(".", ",")})
+            ⭐ Craque do jogo: <strong>{craque.name}</strong> ({craque.detail})
           </p>
         )}
 
-        {(hasResult || best) && (
+        {(hasResult || craque) && (
           <ShareButtons
             label="Mandar resultado no WhatsApp"
-            text={resultMessage(group.name, game.starts_at, game.teams, game.scores, goalList, best ? nameOf(best.member_id) : null)}
+            text={resultMessage(group.name, game.starts_at, game.teams, game.scores, goalList, craque?.name ?? null)}
           />
         )}
       </Card>
@@ -237,6 +258,67 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
               <SubmitButton className="w-full">Salvar resultado</SubmitButton>
             </form>
           </details>
+        </Card>
+      )}
+
+      {mvpOn && (
+        <Card className="space-y-3">
+          <h2 className="font-semibold">Votação do craque</h2>
+          {mvpVotes.length > 0 ? (
+            <ol className="space-y-1 text-sm">
+              {mvpVotes.map((v, i) => (
+                <li key={v.member_id} className="flex items-center justify-between gap-2">
+                  <span>
+                    <span className="inline-block w-6 text-right text-neutral-400">{i + 1}.</span> {nameOf(v.member_id)}
+                    {v.votes === mvpVotes[0].votes && " ⭐"}
+                  </span>
+                  <span className="font-semibold">
+                    {v.votes} {v.votes === 1 ? "voto" : "votos"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-neutral-500">{started ? "Ninguém votou ainda." : "A votação abre quando o jogo começar."}</p>
+          )}
+          {totalMvpVotes > 0 && (
+            <p className="text-xs text-neutral-500">
+              {totalMvpVotes} {totalMvpVotes === 1 ? "pessoa votou" : "pessoas votaram"}. Ninguém sabe quem votou em quem.
+            </p>
+          )}
+
+          {me && iPlayed && started && !readOnly && (
+            <details open={!myVote} className="border-t border-neutral-100 pt-3">
+              <summary className="cursor-pointer font-semibold">
+                {myVote ? `Seu voto: ${nameOf(myVote)} · mudar` : "Votar no craque do jogo"}
+              </summary>
+              <form action={saveMvpVote} className="mt-3 space-y-3">
+                <input type="hidden" name="game_id" value={game.id} />
+                <input type="hidden" name="voter_id" value={me.id} />
+                <ul className="divide-y divide-neutral-100">
+                  {played
+                    .filter((m) => m.id !== me.id)
+                    .map((m) => (
+                      <li key={m.id}>
+                        <label className="flex cursor-pointer items-center gap-3 py-2 text-sm">
+                          <input
+                            type="radio"
+                            name="voted_id"
+                            value={m.id}
+                            defaultChecked={myVote === m.id}
+                            required
+                            className="size-4 accent-pitch-700"
+                          />
+                          {m.name}
+                        </label>
+                      </li>
+                    ))}
+                </ul>
+                <SubmitButton className="w-full">{myVote ? "Mudar voto" : "Votar"}</SubmitButton>
+              </form>
+            </details>
+          )}
+          {me && !iPlayed && started && <p className="text-xs text-neutral-500">Só quem jogou vota no craque.</p>}
         </Card>
       )}
 

@@ -1,10 +1,21 @@
 import { formatGameDate } from "./format";
-import type { GameGoal, RatingSummary, Team } from "./types";
+import type { GameGoal, MvpSummary, RatingSummary, Team } from "./types";
 
 /** Craque do jogo: maior média com pelo menos 2 votos (no empate, mais votos). */
 export function bestPlayer(summary: RatingSummary[]): RatingSummary | null {
   const ranked = rankRatings(summary).filter((r) => r.votes >= 2);
   return ranked[0] ?? null;
+}
+
+/** Votação do craque: mais votado primeiro (no empate, ordem do nome fica para a tela). */
+export function rankMvpVotes(summary: MvpSummary[]): MvpSummary[] {
+  return summary.filter((v) => v.votes > 0).sort((a, b) => b.votes - a.votes);
+}
+
+/** Craque(s) da votação: todos os empatados com mais votos. Vazio se ninguém votou. */
+export function mvpWinners(summary: MvpSummary[]): MvpSummary[] {
+  const ranked = rankMvpVotes(summary);
+  return ranked.filter((v) => v.votes === ranked[0]?.votes);
 }
 
 export function rankRatings(summary: RatingSummary[]): RatingSummary[] {
