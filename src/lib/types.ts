@@ -64,7 +64,8 @@ export type Game = {
   scores: number[] | null;
 };
 
-export type GameGoal = { game_id: string; member_id: string; goals: number };
+/** own_goals: gols contra (sem a migração 20261106120000 não vem do banco). */
+export type GameGoal = { game_id: string; member_id: string; goals: number; own_goals?: number };
 export type RatingSummary = { member_id: string; average: number; votes: number };
 export type MvpSummary = { member_id: string; votes: number };
 

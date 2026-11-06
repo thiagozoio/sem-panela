@@ -9,7 +9,7 @@ import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { sportOf } from "@/lib/sports";
-import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
+import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
 import { LiveGoals } from "./live-goals";
@@ -54,8 +54,10 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const iPlayed = !!me && played.some((m) => m.id === me.id);
 
   const nameOf = (mid: string) => byId.get(mid)?.name ?? "?";
-  const goalsOf = new Map((goals ?? []).map((g) => [g.member_id, g.goals]));
+  const goalsOf = new Map((goals ?? []).filter((g) => g.goals > 0).map((g) => [g.member_id, g.goals]));
+  const ownGoalsOf = new Map((goals ?? []).filter((g) => (g.own_goals ?? 0) > 0).map((g) => [g.member_id, g.own_goals ?? 0]));
   const goalList = scorers(goals ?? [], nameOf);
+  const ownGoalList = ownGoalScorers(goals ?? [], nameOf);
   const playedIds = new Set(played.map((m) => m.id));
   const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => playedIds.has(r.member_id)));
   const mvpVotes = rankMvpVotes(((mvpRows ?? []) as MvpSummary[]).filter((v) => playedIds.has(v.member_id)));
@@ -77,7 +79,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
       ? { name: nameOf(best.member_id), detail: `nota ${Number(best.average).toFixed(1).replace(".", ",")}` }
       : null;
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
-  const hasResult = !!game.scores?.length || goalList.length > 0;
+  const hasResult = !!game.scores?.length || goalList.length > 0 || ownGoalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
 
   // Jogo sem times salvos (não teve sorteio): se o mês tem times fixos, o placar
@@ -143,7 +145,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           )
         )}
 
-        {goalList.length > 0 && (
+        {(goalList.length > 0 || ownGoalList.length > 0) && (
           <div>
             <h3 className="text-sm font-semibold">Gols</h3>
             <ul className="text-sm">
@@ -151,6 +153,11 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
                 <li key={g.name}>
                   ⚽ {g.name}
                   {g.goals > 1 && <span className="text-neutral-500"> ({g.goals})</span>}
+                </li>
+              ))}
+              {ownGoalList.map((g) => (
+                <li key={`contra-${g.name}`}>
+                  ⚽ {g.name} <span className="text-neutral-500">{ownGoalLabel(g.goals)}</span>
                 </li>
               ))}
             </ul>
@@ -166,7 +173,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         {(hasResult || craque) && (
           <ShareButtons
             label="Mandar resultado no WhatsApp"
-            text={resultMessage(group.name, game.starts_at, game.teams, game.scores, goalList, craque?.name ?? null)}
+            text={resultMessage(group.name, game.starts_at, game.teams, game.scores, goalList, craque?.name ?? null, ownGoalList)}
           />
         )}
       </Card>
@@ -181,7 +188,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
                 gameId={game.id}
                 teams={liveTeams}
                 players={played.map((m) => ({ id: m.id, name: m.name }))}
-                initial={{ scores: game.scores, goals: Object.fromEntries(goalsOf) }}
+                initial={{ scores: game.scores, goals: Object.fromEntries(goalsOf), ownGoals: Object.fromEntries(ownGoalsOf) }}
               />
             </div>
           </details>
