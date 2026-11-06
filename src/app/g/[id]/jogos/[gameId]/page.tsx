@@ -11,7 +11,7 @@ import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { sportOf } from "@/lib/sports";
 import { bestPlayer, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, RatingSummary } from "@/lib/types";
-import { saveRatings, saveResult } from "../../actions";
+import { saveLineup, saveRatings, saveResult } from "../../actions";
 
 export const metadata: Metadata = { title: "Resultado" };
 
@@ -49,7 +49,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const nameOf = (mid: string) => byId.get(mid)?.name ?? "?";
   const goalsOf = new Map((goals ?? []).map((g) => [g.member_id, g.goals]));
   const goalList = scorers(goals ?? [], nameOf);
-  const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => byId.has(r.member_id)));
+  const playedIds = new Set(played.map((m) => m.id));
+  const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => playedIds.has(r.member_id)));
   const best = bestPlayer(ranking);
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0;
@@ -73,6 +74,18 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
     }
   }
   const scoreTeams = game.teams ?? fixedTeams;
+
+  // Para corrigir quem jogou: primeiro quem jogou, depois o resto do grupo (convidados no fim).
+  const teamIndex = new Map(game.teams?.flatMap((t, i) => t.players.map((p) => [p.member_id, i] as const)) ?? []);
+  const lineup =
+    canEditResult && started
+      ? [
+          ...played,
+          ...members
+            .filter((m) => m.active && !playedIds.has(m.id))
+            .sort((a, b) => Number(a.guest) - Number(b.guest) || a.name.localeCompare(b.name, "pt-BR")),
+        ]
+      : [];
 
   return (
     <div className="space-y-4">
@@ -130,6 +143,54 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           />
         )}
       </Card>
+
+      {canEditResult && started && (
+        <Card>
+          <details>
+            <summary className="cursor-pointer font-semibold">Corrigir quem jogou</summary>
+            <form action={saveLineup} className="mt-3 space-y-3">
+              <input type="hidden" name="game_id" value={game.id} />
+              <input type="hidden" name="group_id" value={group.id} />
+              <p className="text-sm text-neutral-600">
+                Veio quem não confirmou ou faltou quem confirmou? Ajuste aqui. Só quem jogou dá e recebe nota, entra nos gols
+                {game.teams ? " e nos times" : " e na cobrança de avulso"}. Ninguém recebe aviso.
+              </p>
+              <ul className="divide-y divide-neutral-100">
+                {lineup.map((m) => {
+                  const playing = playedIds.has(m.id);
+                  return (
+                    <li key={m.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                      <span className={playing ? "" : "text-neutral-500"}>
+                        {m.name}
+                        {m.guest && <span className="text-xs text-neutral-400"> (convidado)</span>}
+                      </span>
+                      <Select
+                        name={`who_${m.id}`}
+                        defaultValue={playing ? (game.teams ? String(teamIndex.get(m.id) ?? "") : "1") : ""}
+                        aria-label={`${m.name} jogou?`}
+                        className="w-36 px-2 py-1.5"
+                      >
+                        <option value="">Não jogou</option>
+                        {game.teams ? (
+                          game.teams.map((t, i) => (
+                            <option key={t.name} value={i}>
+                              {t.name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="1">Jogou</option>
+                        )}
+                      </Select>
+                    </li>
+                  );
+                })}
+              </ul>
+              {!game.teams && <p className="text-xs text-neutral-500">Até {group.max_players} jogadores, o limite da pelada.</p>}
+              <SubmitButton className="w-full">Salvar quem jogou</SubmitButton>
+            </form>
+          </details>
+        </Card>
+      )}
 
       {canEditResult && started && (
         <Card>
