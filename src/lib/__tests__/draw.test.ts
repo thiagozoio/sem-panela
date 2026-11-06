@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drawTeams, spread, suggestedTeams, type DrawPlayer } from "../draw";
+import { apartViolations, drawTeams, spread, suggestedTeams, type ApartPair, type DrawPlayer } from "../draw";
 import type { Position } from "../types";
 
 function seeded(seed: number) {
@@ -105,6 +105,53 @@ describe("drawTeams com posições", () => {
       expect(t.players.filter((x) => x.position === "ponteiro")).toHaveLength(2);
       expect(t.players).toHaveLength(6);
     }
+  });
+});
+
+describe("drawTeams com regras de não jogar juntos", () => {
+  const ids = (teams: ReturnType<typeof drawTeams>) => teams.map((t) => t.players);
+
+  it("separa os pares proibidos em vários sorteios", () => {
+    const all = players([5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 3, 4], [4, 2]);
+    const apart: ApartPair[] = [
+      ["f0", "f1"],
+      ["f2", "f3"],
+      ["f4", "g0"],
+      ["f6", "f7"],
+    ];
+    for (let seed = 1; seed <= 40; seed++) {
+      const teams = drawTeams(all, 2, seeded(seed), apart);
+      expect(apartViolations(ids(teams), apart)).toBe(0);
+      expect(teams.flatMap((t) => t.players)).toHaveLength(all.length);
+      const sizes = teams.map((t) => t.players.length);
+      expect(Math.abs(sizes[0] - sizes[1])).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("continua equilibrado pelo nível", () => {
+    const all = players([5, 5, 5, 1, 1, 1, 3, 3, 3, 3]);
+    const apart: ApartPair[] = [["f0", "f1"], ["f3", "f4"]];
+    const skill = skillOf(all);
+    for (let seed = 1; seed <= 20; seed++) {
+      const teams = drawTeams(all, 2, seeded(seed), apart);
+      expect(apartViolations(ids(teams), apart)).toBe(0);
+      const totals = teams.map((t) => t.players.reduce((sum, p) => sum + skill.get(p.member_id)!, 0));
+      expect(spread(totals)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("separa grupo de três em três times", () => {
+    const all = players([3, 3, 3, 3, 3, 3, 3, 3, 3]);
+    const apart: ApartPair[] = [["f0", "f1"], ["f0", "f2"], ["f1", "f2"]];
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(apartViolations(ids(drawTeams(all, 3, seeded(seed), apart)), apart)).toBe(0);
+    }
+  });
+
+  it("ignora regra de quem não está na lista", () => {
+    const all = players([3, 3, 3, 3]);
+    const teams = drawTeams(all, 2, seeded(1), [["f0", "x9"]]);
+    expect(teams.flatMap((t) => t.players)).toHaveLength(4);
   });
 });
 

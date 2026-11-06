@@ -7,6 +7,7 @@ import { getGroupContext } from "@/lib/groups";
 import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
 import { drawTeams } from "@/lib/draw";
+import { apartPairs } from "@/lib/apart";
 import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
@@ -227,6 +228,21 @@ export async function pushMessage(_prev: PushState, fd: FormData): Promise<PushS
 // Sorteio
 // ---------------------------------------------------------------------------
 
+export async function addApartRule(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const [a, b] = [str(fd, "member_a"), str(fd, "member_b")].sort();
+  if (!a || !b || a === b) return;
+  const supabase = await createClient();
+  await supabase.from("member_apart").insert({ group_id: groupId, member_a: a, member_b: b });
+  refresh();
+}
+
+export async function removeApartRule(fd: FormData) {
+  const supabase = await createClient();
+  await supabase.from("member_apart").delete().eq("id", str(fd, "rule_id")).eq("group_id", str(fd, "group_id"));
+  refresh();
+}
+
 async function confirmedForGame(groupId: string, gameId: string) {
   const ctx = await getGroupContext(groupId);
   if (!ctx.isOrganizer) return null;
@@ -242,6 +258,7 @@ async function confirmedForGame(groupId: string, gameId: string) {
     supabase,
     game,
     userId: ctx.user.id,
+    apart: await apartPairs(supabase, groupId),
     players: confirmed.map(({ member }) => toDrawPlayer(sport, member)),
     guestIds: new Set(confirmed.filter((e) => e.member.guest).map((e) => e.member.id)),
   };
@@ -251,7 +268,7 @@ export async function drawTeamsAction(fd: FormData) {
   const gameId = str(fd, "game_id");
   const data = await confirmedForGame(str(fd, "group_id"), gameId);
   if (!data) return;
-  const teams = drawTeams(data.players, clampInt(str(fd, "teams"), 2, 8, 2));
+  const teams = drawTeams(data.players, clampInt(str(fd, "teams"), 2, 8, 2), Math.random, data.apart);
   const { error } = await data.supabase.from("games").update({ teams }).eq("id", gameId);
   if (!error) after(() => notifyTeamsDrawn(data.game.group_id, gameId, data.userId));
   refresh();
@@ -274,7 +291,7 @@ async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<Retu
     ...t,
     member_ids: [...t.member_ids, ...[...guestTeam].filter(([, name]) => name === t.name).map(([id]) => id)],
   }));
-  return teamsFromFixed(withGuests, data.players);
+  return teamsFromFixed(withGuests, data.players, data.apart);
 }
 
 /** Monta os times do jogo com os times fixos do mês. */
@@ -647,7 +664,10 @@ export async function createFixedTeams(fd: FormData) {
   const mensalistas = members
     .filter((m) => m.active && m.kind === "mensalista")
     .map((m) => toDrawPlayer(sport, m));
-  const drawn = str(fd, "fill") === "1" && mensalistas.length >= 2 ? drawTeams(mensalistas, count) : [];
+  const drawn =
+    str(fd, "fill") === "1" && mensalistas.length >= 2
+      ? drawTeams(mensalistas, count, Math.random, await apartPairs(supabase, groupId))
+      : [];
   await supabase.from("fixed_teams").insert(
     Array.from({ length: count }, (_, i) => ({
       group_id: groupId,

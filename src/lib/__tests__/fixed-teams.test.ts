@@ -47,4 +47,16 @@ describe("teamsFromFixed", () => {
     expect(teams.map((t) => t.name)).toEqual(["Azul", "Branco"]);
     expect(teams.flatMap((t) => t.players)).toHaveLength(3);
   });
+
+  it("avulso evita o time de quem ele não joga junto", () => {
+    const teams = teamsFromFixed(
+      [
+        { name: "Azul", member_ids: ["a1", "a2"] },
+        { name: "Branco", member_ids: ["b1", "b2"] },
+      ],
+      [p("a1", 1), p("a2", 1), p("b1", 5), p("b2", 5), p("x")],
+      [["x", "a1"]],
+    );
+    expect(teams[1].players.map((q) => q.member_id)).toContain("x");
+  });
 });
