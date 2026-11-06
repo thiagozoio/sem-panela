@@ -7,7 +7,8 @@ import { getGroupContext } from "@/lib/groups";
 import { positionInfo, positionOf, positionOptions, sportOf, type Sport } from "@/lib/sports";
 import { formatPhone, whatsappTo } from "@/lib/matches";
 import type { Member } from "@/lib/types";
-import { addMember, setMemberActive, updateMember } from "../actions";
+import { apartRules } from "@/lib/apart";
+import { addApartRule, addMember, removeApartRule, setMemberActive, updateMember } from "../actions";
 import { AccessLinkButton } from "./access-link-button";
 import { OrganizerButton } from "./organizer-button";
 
@@ -72,12 +73,16 @@ function MemberFields({ member, sport, isNew = false }: { member?: Member; sport
 
 export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogadores">) {
   const { id } = await params;
-  const { group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
+  const { supabase, group, members, me, isOrganizer, readOnly } = await getGroupContext(id);
   // Convidados de um jogo só não entram na lista de jogadores do grupo.
   const active = members.filter((m) => m.active && !m.guest);
   const inactive = members.filter((m) => !m.active && !m.guest);
   const canEdit = isOrganizer && !readOnly;
   const sport = sportOf(group.sport);
+  const nameOf = new Map(members.map((m) => [m.id, m.name]));
+  const rules = isOrganizer
+    ? (await apartRules(supabase, group.id)).filter((r) => nameOf.has(r.member_a) && nameOf.has(r.member_b))
+    : [];
 
   return (
     <div className="space-y-4">
@@ -157,6 +162,60 @@ export default async function PlayersPage({ params }: PageProps<"/g/[id]/jogador
               <SubmitButton className="w-full">Cadastrar</SubmitButton>
             </form>
           </details>
+        </Card>
+      )}
+
+      {isOrganizer && (
+        <Card className="space-y-3">
+          <div>
+            <h2 className="font-semibold">Regras do sorteio</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              O sorteio já equilibra os times pelo nível (as estrelas) e pela posição. Aqui você escolhe quem não pode cair no
+              mesmo time. Vale para “Sortear times” e para distribuir os times fixos. Só os organizadores veem.
+            </p>
+          </div>
+          {rules.length > 0 && (
+            <ul className="divide-y divide-neutral-100">
+              {rules.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                  <span>
+                    <b>{nameOf.get(r.member_a)}</b> e <b>{nameOf.get(r.member_b)}</b> não jogam juntos
+                  </span>
+                  {canEdit && (
+                    <form action={removeApartRule}>
+                      <input type="hidden" name="group_id" value={group.id} />
+                      <input type="hidden" name="rule_id" value={r.id} />
+                      <Button variant="ghost" className="px-3 py-1.5">
+                        Tirar
+                      </Button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && active.length >= 2 && (
+            <form action={addApartRule} className="space-y-2 rounded-xl bg-neutral-50 p-3">
+              <input type="hidden" name="group_id" value={group.id} />
+              <div className="grid grid-cols-2 gap-2">
+                <Select name="member_a" required defaultValue="" aria-label="Primeiro jogador">
+                  <option value="" disabled>Jogador</option>
+                  {active.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </Select>
+                <Select name="member_b" required defaultValue="" aria-label="Segundo jogador">
+                  <option value="" disabled>Não joga com…</option>
+                  {active.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <SubmitButton variant="secondary" className="w-full" pendingText="Salvando…">
+                + Não podem jogar no mesmo time
+              </SubmitButton>
+            </form>
+          )}
         </Card>
       )}
 

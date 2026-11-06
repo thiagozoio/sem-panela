@@ -342,6 +342,13 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
                 Apagar sorteio
               </Button>
             )}
+            <p className="w-full text-xs text-neutral-500">
+              Equilibra pelo nível e pela posição. Para separar jogadores que não podem cair juntos, use{" "}
+              <Link href={`/g/${group.id}/jogadores`} className="underline">
+                Jogadores › Regras do sorteio
+              </Link>
+              .
+            </p>
           </form>
         )}
       </Card>
