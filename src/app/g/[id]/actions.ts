@@ -334,6 +334,68 @@ export async function saveResult(fd: FormData) {
   refresh();
 }
 
+/**
+ * Depois do jogo o organizador corrige quem jogou: campos "who_<member_id>" com
+ * "" (não jogou), "1" (jogou, jogo sem times) ou o índice do time do jogo.
+ * Ajusta a presença, os times salvos e apaga gols de quem não jogou. Ninguém é avisado.
+ */
+export async function saveLineup(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.isOrganizer || ctx.readOnly) return;
+  const { supabase, members, group } = ctx;
+  const [{ data: game }, { data: attendances }] = await Promise.all([
+    supabase.from("games").select("*").eq("id", gameId).eq("group_id", group.id).single<Game>(),
+    supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>(),
+  ]);
+  if (!game || new Date(game.starts_at).getTime() > Date.now()) return;
+
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const choice = new Map<string, string>();
+  for (const k of fd.keys()) {
+    if (k.startsWith("who_") && byId.has(k.slice(4))) choice.set(k.slice(4), str(fd, k));
+  }
+  const current = new Map((attendances ?? []).map((a) => [a.member_id, a]));
+  const now = new Date().toISOString();
+
+  for (const [memberId, value] of choice) {
+    const playing = value !== "";
+    const a = current.get(memberId);
+    if (playing && !a) {
+      await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true });
+    } else if (a && a.going !== playing) {
+      await supabase
+        .from("attendances")
+        .update(playing ? { going: true, confirmed_at: now } : { going: false })
+        .eq("game_id", gameId)
+        .eq("member_id", memberId);
+    }
+  }
+
+  // Times salvos: cada um fica no time escolhido e quem não jogou sai. Os times
+  // continuam na mesma ordem (o placar é guardado pela posição de cada time).
+  if (game.teams) {
+    const sport = sportOf(group.sport);
+    const teams = game.teams.map((t, i) => {
+      const kept = t.players.filter((p) => !choice.has(p.member_id) || choice.get(p.member_id) === String(i));
+      const keptIds = new Set(kept.map((p) => p.member_id));
+      const added = [...choice]
+        .filter(([mid, v]) => v === String(i) && !keptIds.has(mid))
+        .map(([mid]) => {
+          const { member_id, name, position } = toDrawPlayer(sport, byId.get(mid)!);
+          return { member_id, name, position };
+        });
+      return { name: t.name, players: [...kept, ...added] };
+    });
+    await supabase.from("games").update({ teams }).eq("id", gameId);
+  }
+
+  const removed = [...choice].filter(([, v]) => v === "").map(([mid]) => mid);
+  if (removed.length) await supabase.from("game_goals").delete().eq("game_id", gameId).in("member_id", removed);
+  refresh();
+}
+
 /** Notas que o jogador logado deu; campos "rating_<member_id>" (vazio = sem nota). */
 export async function saveRatings(fd: FormData) {
   const gameId = str(fd, "game_id");
