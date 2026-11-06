@@ -7,6 +7,14 @@ export function bestPlayer(summary: RatingSummary[]): RatingSummary | null {
   return ranked[0] ?? null;
 }
 
+/** A votação do craque fica aberta por 48 horas a partir do início do jogo. */
+export const MVP_VOTE_HOURS = 48;
+
+export function mvpVoteOpen(startsAt: string, now = new Date()): boolean {
+  const start = new Date(startsAt).getTime();
+  return start <= now.getTime() && now.getTime() < start + MVP_VOTE_HOURS * 3600_000;
+}
+
 /** Votação do craque: mais votado primeiro (no empate, ordem do nome fica para a tela). */
 export function rankMvpVotes(summary: MvpSummary[]): MvpSummary[] {
   return summary.filter((v) => v.votes > 0).sort((a, b) => b.votes - a.votes);

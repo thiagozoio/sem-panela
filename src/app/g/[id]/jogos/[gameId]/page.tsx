@@ -9,7 +9,7 @@ import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
 import { sportOf } from "@/lib/sports";
-import { bestPlayer, mvpWinners, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
+import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
 
@@ -60,6 +60,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const mvpOn = mvpRows !== null; // a votação existe no banco
   const totalMvpVotes = mvpVotes.reduce((n, v) => n + v.votes, 0);
   const myVote = myVoteRow?.voted_id ?? "";
+  const voteOpen = mvpVoteOpen(game.starts_at);
 
   // Craque do jogo: o mais votado pelos jogadores (empate = todos os empatados).
   // Sem nenhum voto, continua valendo a maior média das notas.
@@ -279,7 +280,9 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-neutral-500">{started ? "Ninguém votou ainda." : "A votação abre quando o jogo começar."}</p>
+            <p className="text-sm text-neutral-500">
+              {!started ? "A votação abre quando o jogo começar." : voteOpen ? "Ninguém votou ainda." : "Ninguém votou."}
+            </p>
           )}
           {totalMvpVotes > 0 && (
             <p className="text-xs text-neutral-500">
@@ -287,7 +290,15 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
             </p>
           )}
 
-          {me && iPlayed && started && !readOnly && (
+          {started && (
+            <p className="text-xs text-neutral-500">
+              {voteOpen
+                ? `Votação aberta até ${formatGameDate(new Date(new Date(game.starts_at).getTime() + MVP_VOTE_HOURS * 3600_000).toISOString())}.`
+                : "Votação encerrada."}
+            </p>
+          )}
+
+          {me && iPlayed && voteOpen && !readOnly && (
             <details open={!myVote} className="border-t border-neutral-100 pt-3">
               <summary className="cursor-pointer font-semibold">
                 {myVote ? `Seu voto: ${nameOf(myVote)} · mudar` : "Votar no craque do jogo"}
@@ -318,7 +329,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
               </form>
             </details>
           )}
-          {me && !iPlayed && started && <p className="text-xs text-neutral-500">Só quem jogou vota no craque.</p>}
+          {me && !iPlayed && voteOpen && <p className="text-xs text-neutral-500">Só quem jogou vota no craque.</p>}
         </Card>
       )}
 
