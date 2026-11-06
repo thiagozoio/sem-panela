@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Badge, Button, Card, Input } from "@/components/ui";
+import { Badge, Button, Card, Input, LinkButton } from "@/components/ui";
 import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
-import { formatGameDate, monthOf } from "@/lib/format";
+import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
 import { byPosition, positionInfo, positionOptions, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, FixedTeam, Game, Member } from "@/lib/types";
@@ -102,6 +102,12 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
             {list.confirmed.length}/{group.max_players}
           </Badge>
         </div>
+
+        {isOrganizer && !readOnly && hasStarted(game.starts_at) && (
+          <LinkButton href={`/g/${group.id}/jogos/${game.id}#ao-vivo`} className="w-full">
+            ⚽ Jogo rolando: marcar gols ao vivo
+          </LinkButton>
+        )}
 
         {me && !plays(me) && (
           <p className="text-sm text-neutral-600">

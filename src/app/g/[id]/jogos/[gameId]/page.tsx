@@ -12,10 +12,12 @@ import { sportOf } from "@/lib/sports";
 import { bestPlayer, mvpWinners, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
+import { LiveGoals } from "./live-goals";
 
 export const metadata: Metadata = { title: "Resultado" };
 
 const NOTES = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+const LIVE_HOURS = 6;
 
 export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogos/[gameId]">) {
   const { id, gameId } = await params;
@@ -95,6 +97,9 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
     }
   }
   const scoreTeams = game.teams ?? fixedTeams;
+  // Placar ao vivo: aberto nas primeiras horas do jogo; depois fica fechado (dá para usar igual).
+  const live = !hasStarted(new Date(new Date(game.starts_at).getTime() + LIVE_HOURS * 3600_000).toISOString());
+  const liveTeams = scoreTeams?.map((t) => ({ ...t, players: t.players.filter((p) => playedIds.has(p.member_id)) })) ?? null;
 
   // Para corrigir quem jogou: primeiro quem jogou, depois o resto do grupo (convidados no fim).
   const teamIndex = new Map(game.teams?.flatMap((t, i) => t.players.map((p) => [p.member_id, i] as const)) ?? []);
@@ -167,6 +172,23 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
 
       {canEditResult && started && (
         <Card>
+          <details open={live} id="ao-vivo">
+            <summary className="cursor-pointer font-semibold">⚽ Marcar gols ao vivo</summary>
+            <div className="mt-3">
+              <LiveGoals
+                groupId={group.id}
+                gameId={game.id}
+                teams={liveTeams}
+                players={played.map((m) => ({ id: m.id, name: m.name }))}
+                initial={{ scores: game.scores, goals: Object.fromEntries(goalsOf) }}
+              />
+            </div>
+          </details>
+        </Card>
+      )}
+
+      {canEditResult && started && (
+        <Card>
           <details>
             <summary className="cursor-pointer font-semibold">Corrigir quem jogou</summary>
             <form action={saveLineup} className="mt-3 space-y-3">
@@ -215,9 +237,14 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
 
       {canEditResult && started && (
         <Card>
-          <details open={!hasResult}>
+          <details open={!hasResult && !live}>
             <summary className="cursor-pointer font-semibold">{hasResult ? "Corrigir placar e gols" : "Anotar placar e gols"}</summary>
-            <form action={saveResult} className="mt-3 space-y-4">
+            <form
+              action={saveResult}
+              className="mt-3 space-y-4"
+              // Remonta quando o placar muda (ex.: gols ao vivo), para não salvar números velhos.
+              key={JSON.stringify([game.scores, goals])}
+            >
               <input type="hidden" name="game_id" value={game.id} />
               <input type="hidden" name="group_id" value={group.id} />
               {!game.teams && fixedTeams && <input type="hidden" name="use_fixed" value="1" />}
