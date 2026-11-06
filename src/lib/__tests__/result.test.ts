@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestPlayer, mvpWinners, resultMessage, scorers } from "../result";
+import { bestPlayer, mvpVoteOpen, mvpWinners, resultMessage, scorers } from "../result";
 
 describe("bestPlayer", () => {
   it("pega a maior média com pelo menos 2 votos", () => {
@@ -64,5 +64,18 @@ describe("mvpWinners", () => {
 
   it("sem votos, ninguém", () => {
     expect(mvpWinners([])).toEqual([]);
+  });
+});
+
+describe("mvpVoteOpen", () => {
+  const start = "2026-11-05T23:00:00Z";
+  it("fechada antes do jogo", () => {
+    expect(mvpVoteOpen(start, new Date("2026-11-05T22:59:00Z"))).toBe(false);
+  });
+  it("aberta até 48 horas depois do início", () => {
+    expect(mvpVoteOpen(start, new Date("2026-11-07T22:59:00Z"))).toBe(true);
+  });
+  it("fechada depois de 48 horas", () => {
+    expect(mvpVoteOpen(start, new Date("2026-11-07T23:00:00Z"))).toBe(false);
   });
 });
