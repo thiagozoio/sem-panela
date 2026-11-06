@@ -26,7 +26,8 @@ import {
 } from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
-import type { Attendance, FixedTeam, Game, Member, MemberKind, Position } from "@/lib/types";
+import { applyLiveGoal, type LiveState } from "@/lib/live";
+import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
 // são garantidas pela RLS do banco; as ações só carregam o grupo inteiro quando precisam dos dados.
@@ -332,6 +333,74 @@ export async function saveResult(fd: FormData) {
   const scored = goals.filter((g) => g.goals > 0);
   if (scored.length) await supabase.from("game_goals").insert(scored);
   refresh();
+}
+
+/**
+ * Placar ao vivo: um gol a mais ou a menos, salvo na hora. Com member_id mexe nos gols
+ * do jogador e no placar do time dele; com team (índice) é gol sem autor, só no placar.
+ * Jogo sem times salvos mas com times fixos no mês: os times fixos viram os times do jogo.
+ * Devolve o placar e os gols como ficaram no banco (ou null se não deu).
+ */
+export async function liveGoal(input: {
+  groupId: string;
+  gameId: string;
+  delta: 1 | -1;
+  memberId?: string;
+  team?: number;
+}): Promise<LiveState | null> {
+  const { groupId, gameId } = input;
+  const delta = input.delta === -1 ? -1 : 1;
+  const data = await confirmedForGame(groupId, gameId);
+  if (!data || data.game.group_id !== groupId) return null;
+  const { supabase, game } = data;
+  if (new Date(game.starts_at).getTime() > Date.now()) return null;
+
+  let teams = game.teams;
+  let teamsUpdate = {};
+  if (!teams) {
+    const fixed = await fixedTeamsForGame(groupId, data);
+    if (fixed && fixed.length >= 2) {
+      teams = fixed;
+      teamsUpdate = { teams };
+    }
+  }
+
+  const { data: goalRows } = await supabase.from("game_goals").select("*").eq("game_id", gameId).returns<GameGoal[]>();
+  const before: LiveState = { scores: game.scores, goals: Object.fromEntries((goalRows ?? []).map((g) => [g.member_id, g.goals])) };
+  let target: { memberId: string } | { team: number };
+  if (input.memberId) {
+    // Só quem está nos times (ou, sem times, na lista de confirmados) ou já tem gol.
+    const known = teams
+      ? teams.some((t) => t.players.some((p) => p.member_id === input.memberId))
+      : data.players.some((p) => p.member_id === input.memberId);
+    if (!known && !(input.memberId in before.goals)) return null;
+    target = { memberId: input.memberId };
+  } else {
+    if (!teams || input.team === undefined || !Number.isInteger(input.team)) return null;
+    target = { team: input.team };
+  }
+  const next = applyLiveGoal(before, teams, delta, target);
+  if (next === before) return before;
+
+  if ("memberId" in target) {
+    const id = target.memberId;
+    const was = before.goals[id] ?? 0;
+    const now = next.goals[id] ?? 0;
+    const res = !now
+      ? await supabase.from("game_goals").delete().eq("game_id", gameId).eq("member_id", id)
+      : was
+        ? await supabase.from("game_goals").update({ goals: now }).eq("game_id", gameId).eq("member_id", id)
+        : await supabase.from("game_goals").insert({ game_id: gameId, member_id: id, goals: now });
+    if (res.error) return null;
+  }
+  if (teams && (JSON.stringify(next.scores) !== JSON.stringify(before.scores) || "teams" in teamsUpdate)) {
+    const { error } = await supabase
+      .from("games")
+      .update({ scores: next.scores, ...teamsUpdate })
+      .eq("id", gameId);
+    if (error) return null;
+  }
+  return next;
 }
 
 /**
