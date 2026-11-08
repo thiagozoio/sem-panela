@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDay, formatMoney } from "@/lib/format";
 import { GRACE_DAYS, PRICE_CENTS, type SubscriptionState } from "@/lib/subscription";
 
@@ -32,11 +33,14 @@ export function BillingBanner({
   paidUntil,
   organizer,
   groupName,
+  payHref,
 }: {
   state: SubscriptionState;
   paidUntil: string;
   organizer: boolean;
   groupName: string;
+  /** Com a cobrança automática ligada: link para assinar/pagar nos ajustes. */
+  payHref?: string;
 }) {
   if (state.status === "ok") return null;
 
@@ -64,7 +68,13 @@ export function BillingBanner({
     <div className={`space-y-1 rounded-2xl p-3 text-sm ring-1 ${tone}`}>
       <p className="font-semibold">{title}</p>
       <p>
-        <PayInstructions groupName={groupName} />
+        {payHref ? (
+          <Link className="font-semibold underline" href={payHref}>
+            Pagar por Pix ou cartão
+          </Link>
+        ) : (
+          <PayInstructions groupName={groupName} />
+        )}
       </p>
     </div>
   );

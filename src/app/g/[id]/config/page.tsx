@@ -2,18 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
 import { CopyField, ShareButtons } from "@/components/share";
-import { PayInstructions } from "@/components/billing-banner";
 import { getGroupContext } from "@/lib/groups";
-import { formatDay } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 import { SettingsForm } from "./settings-form";
+import { BillingCard } from "./billing-card";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
 export default async function SettingsPage({ params, searchParams }: PageProps<"/g/[id]/config">) {
   const { id } = await params;
   const { novo } = await searchParams;
-  const { group, isOrganizer, readOnly, subscription } = await getGroupContext(id);
+  const { supabase, user, group, isOrganizer, readOnly, subscription } = await getGroupContext(id);
   if (!isOrganizer) notFound();
 
   const inviteUrl = `${await siteUrl()}/convite/${group.invite_code}`;
@@ -38,16 +37,9 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
         <SettingsForm group={group} disabled={readOnly} />
       </Card>
 
-      <Card className="space-y-2 text-sm">
-        <h2 className="font-semibold">Assinatura do Sem Panela</h2>
-        <p>
-          {subscription.status === "read_only" ? "Venceu em " : "Paga até "}
-          <strong>{formatDay(group.paid_until)}</strong>.
-        </p>
-        <p className="text-neutral-600">
-          Para renovar: <PayInstructions groupName={group.name} /> A liberação é feita à mão em até 1 dia útil.
-        </p>
-      </Card>
+      <div id="assinatura" className="scroll-mt-4">
+        <BillingCard supabase={supabase} group={group} subscription={subscription} userName={user.name} />
+      </div>
     </div>
   );
 }
