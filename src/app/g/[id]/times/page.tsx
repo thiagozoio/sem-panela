@@ -30,6 +30,9 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
   const byId = new Map(members.map((m) => [m.id, m]));
   const inTeam = new Set(teams.flatMap((t) => t.member_ids));
   const withoutTeam = members.filter((m) => regularPlayer(m) && !inTeam.has(m.id));
+  // Convidado posto num time antes do sorteio fica aqui só para cair no time certo nos jogos
+  // em que for convidado; nos outros jogos ele não entra (só joga quem confirmou).
+  const guestInTeam = teams.some((t) => t.member_ids.some((mid) => byId.get(mid)?.guest));
   const sport = sportOf(group.sport);
   const order = byPosition(sport);
   const tag = (m: Member) => {
@@ -127,12 +130,13 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
                     <p className="text-sm text-neutral-500">Sem jogadores ainda.</p>
                   ) : (
                     <ul className="divide-y divide-neutral-100 text-sm">
-                      {players.sort(order).map((m) => (
+                      {players.sort((a, b) => Number(!!a.guest) - Number(!!b.guest) || order(a, b)).map((m) => (
                         <li key={m.id} className="flex items-center justify-between gap-2 py-1.5">
                           <span>
                             {keeper(m)}
                             {m.name}
                             {tag(m)}
+                            {m.guest && <span className="text-xs text-amber-700"> · convidado</span>}
                           </span>
                           {canEdit && teamPicker(m, t.id)}
                         </li>
@@ -152,6 +156,13 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
               );
             })}
           </div>
+
+          {guestInTeam && (
+            <p className="text-xs text-neutral-500">
+              Convidado aparece no time em que foi posto, mas só joga nos jogos em que for convidado. Ele não entra em Jogadores
+              nem paga, e não passa para o mês seguinte ao repetir os times.
+            </p>
+          )}
 
           {canEdit && withoutTeam.length > 0 && (
             <Card className="space-y-2">
