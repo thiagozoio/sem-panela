@@ -9,6 +9,7 @@ import { getCurrentUser, getSessionUser, safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isLinkEmail } from "@/lib/player-link";
 import { pushEnabled, VAPID_PUBLIC_KEY } from "@/lib/push";
+import { PasswordForm } from "./password-form";
 
 export const metadata: Metadata = { title: "Perfil" };
 
@@ -28,7 +29,9 @@ async function saveProfile(formData: FormData) {
 export default async function ProfilePage({ searchParams }: PageProps<"/perfil">) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/perfil");
-  const { next } = await searchParams;
+  const { next, senha } = await searchParams;
+  const wantsPassword = senha === "1";
+  const canHavePassword = !!user.email && !isLinkEmail(user.email);
   // Quem entrou com Google já chega com o nome da conta como sugestão.
   let suggested = user.name;
   if (!suggested) {
@@ -44,11 +47,24 @@ export default async function ProfilePage({ searchParams }: PageProps<"/perfil">
         <form action={saveProfile} className="space-y-4">
           <input type="hidden" name="next" value={safeNext(next)} />
           <Field label="Nome ou apelido">
-            <Input name="name" defaultValue={suggested} placeholder="Ex.: Juninho" maxLength={60} required autoFocus />
+            <Input name="name" defaultValue={suggested} placeholder="Ex.: Juninho" maxLength={60} required autoFocus={!wantsPassword || !user.name} />
           </Field>
           <SubmitButton className="w-full">Salvar</SubmitButton>
         </form>
       </Card>
+      {user.name && canHavePassword && (
+        <Card className="space-y-3">
+          <div>
+            <h2 className="font-semibold">Senha</h2>
+            <p className="text-sm text-neutral-600">
+              {wantsPassword
+                ? "Crie uma senha nova para entrar com o seu e-mail."
+                : "Opcional. Com uma senha, você entra com e-mail e senha, sem esperar o código chegar. Serve também para trocar a senha que já tem."}
+            </p>
+          </div>
+          <PasswordForm email={user.email} focus={wantsPassword} />
+        </Card>
+      )}
       {user.name && pushEnabled() && (
         <Card className="space-y-2">
           <h2 className="font-semibold">Avisos no celular</h2>
