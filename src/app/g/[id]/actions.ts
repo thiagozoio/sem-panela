@@ -693,9 +693,18 @@ export async function copyFixedTeams(fd: FormData) {
     .order("sort")
     .returns<FixedTeam[]>();
   if (!previous?.length) return;
-  await supabase
-    .from("fixed_teams")
-    .insert(previous.map(({ name, sort, member_ids }) => ({ group_id: groupId, month, name, sort, member_ids })));
+  // Convidados não passam para o mês seguinte: eles só estavam no time pelo jogo em que vieram.
+  const { data: guests } = await supabase.from("members").select("id").eq("group_id", groupId).eq("guest", true);
+  const guestIds = new Set((guests ?? []).map((g) => g.id as string));
+  await supabase.from("fixed_teams").insert(
+    previous.map(({ name, sort, member_ids }) => ({
+      group_id: groupId,
+      month,
+      name,
+      sort,
+      member_ids: member_ids.filter((id) => !guestIds.has(id)),
+    })),
+  );
   refresh();
 }
 
