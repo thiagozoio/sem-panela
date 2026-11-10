@@ -6,6 +6,7 @@ import { getGroupContext } from "@/lib/groups";
 import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
+import { guestTeams, withGuestTeams } from "@/lib/fixed-teams";
 import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
 import { byPosition, positionInfo, positionOptions, sportOf, type Sport } from "@/lib/sports";
 import type { Attendance, FixedTeam, Game, Member } from "@/lib/types";
@@ -66,10 +67,12 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
   const origin = await siteUrl();
   const push = pushEnabled();
   const fixedTeams = isOrganizer && !readOnly ? (fixedRows?.length ?? 0) : 0;
+  // Times fixos do mês com os convidados deste jogo no time escolhido para eles (só neste jogo).
+  const fixedWithGuests = withGuestTeams(fixedRows ?? [], guestTeams(attendances ?? [], members));
   // Na lista mandada no WhatsApp, cada confirmado aparece com o time dele:
   // os times do jogo (sorteados ou aplicados) ou, se ainda não tiver, os times fixos do mês.
   const teamOf = teamNames(
-    game.teams?.map((t) => ({ name: t.name, member_ids: t.players.map((p) => p.member_id) })) ?? fixedRows ?? [],
+    game.teams?.map((t) => ({ name: t.name, member_ids: t.players.map((p) => p.member_id) })) ?? fixedWithGuests,
   );
 
   const drawnIds = new Set(game.teams?.flatMap((t) => t.players.map((p) => p.member_id)) ?? []);
@@ -272,7 +275,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
                 positions={positionOptions(sport)}
                 teams={
                   game.teams?.map((t) => ({ name: t.name, count: t.players.length })) ??
-                  (fixedRows ?? []).map((t) => ({ name: t.name, count: t.member_ids.length }))
+                  fixedWithGuests.map((t) => ({ name: t.name, count: t.member_ids.length }))
                 }
                 fixed={!game.teams}
               />

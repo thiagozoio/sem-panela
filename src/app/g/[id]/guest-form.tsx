@@ -20,7 +20,7 @@ export function GuestForm({
   positions: { value: string; label: string }[];
   /** Times para escolher: os do jogo, se já montados, ou os times fixos do mês. */
   teams: { name: string; count: number }[];
-  /** Os times ainda não foram montados, então a escolha vale para os times fixos do mês. */
+  /** Os times ainda não foram montados: a escolha fica guardada só para este jogo. */
   fixed?: boolean;
 }) {
   const [state, action] = useActionState(addGuest, {});
@@ -52,7 +52,7 @@ export function GuestForm({
           <div className="col-span-2">
             <Field
               label="Time"
-              hint={fixed ? "Times fixos do mês. Ele já entra nesse time quando você usar os times fixos." : "Escolha o time que está faltando gente."}
+              hint={fixed ? "Vale só para este jogo. Ele entra nesse time quando você usar os times fixos." : "Escolha o time que está faltando gente."}
             >
               <Select name="team" defaultValue="">
                 <option value="">{fixed ? "Deixar sem time" : "O que tem menos gente"}</option>
