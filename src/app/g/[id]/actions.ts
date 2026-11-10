@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
 import { drawTeams } from "@/lib/draw";
 import { apartPairs } from "@/lib/apart";
-import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
+import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/fixed-teams";
 import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf } from "@/lib/sports";
@@ -127,52 +127,43 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
   }
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
 
+  const team = str(fd, "team");
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  const drawn = !!game?.teams?.length;
+  // Ainda sem sorteio: o time escolhido fica guardado só na presença deste jogo
+  // (não nos times fixos do mês), e vale quando o organizador usar os times fixos.
+  const gameTeam = !drawn && team ? team.slice(0, 30) : null;
+
   const { data: current } = await supabase
     .from("attendances")
     .select("going")
     .eq("game_id", gameId)
     .eq("member_id", memberId)
     .maybeSingle<{ going: boolean }>();
-  if (!current) await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true });
-  else if (!current.going) {
-    await supabase
-      .from("attendances")
-      .update({ going: true, confirmed_at: new Date().toISOString() })
-      .eq("game_id", gameId)
-      .eq("member_id", memberId);
+  const { error: attendanceError } = !current
+    ? await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true, team: gameTeam })
+    : await supabase
+        .from("attendances")
+        .update(current.going ? { team: gameTeam } : { going: true, team: gameTeam, confirmed_at: new Date().toISOString() })
+        .eq("game_id", gameId)
+        .eq("member_id", memberId);
+  if (attendanceError) {
+    return {
+      error: attendanceError.message.includes("team")
+        ? "Falta rodar a atualização do banco (time do convidado) no Supabase."
+        : "Não deu para pôr o convidado. Tente de novo.",
+    };
   }
 
-  const team = str(fd, "team");
-  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
-  let joined = "";
-  if (game?.teams?.length) {
+  let joined = gameTeam ?? "";
+  if (drawn && game?.teams) {
     // Times do jogo já montados: entra direto no time escolhido.
     const player = { member_id: memberId, name, position: positionOf(sportOf(group.sport), position) };
     await supabase.from("games").update({ teams: addToTeam(game.teams, player, team) }).eq("id", gameId);
     joined = team;
-  } else if (team && game) {
-    // Ainda sem sorteio: entra no time fixo do mês, para já cair nele em "Usar times fixos".
-    joined = (await putInFixedTeam(supabase, groupId, monthOf(game.starts_at), memberId, team)) ? team : "";
   }
   refresh();
   return { added: joined ? `${name} entrou no ${joined}` : `${name} entrou na lista` };
-}
-
-/** Põe o convidado num time fixo do mês (e tira dos outros). Devolve false se o time não existe. */
-async function putInFixedTeam(supabase: Client, groupId: string, month: string, memberId: string, team: string) {
-  const { data: fixed } = await supabase
-    .from("fixed_teams")
-    .select("id, name, member_ids")
-    .eq("group_id", groupId)
-    .eq("month", month)
-    .returns<Pick<FixedTeam, "id" | "name" | "member_ids">[]>();
-  const target = (fixed ?? []).find((t) => t.name === team);
-  if (!target) return false;
-  for (const t of fixed ?? []) {
-    const ids = t.id === target.id ? [...new Set([...t.member_ids, memberId])] : t.member_ids.filter((id) => id !== memberId);
-    if (ids.length !== t.member_ids.length) await supabase.from("fixed_teams").update({ member_ids: ids }).eq("id", t.id);
-  }
-  return true;
 }
 
 /** Tira o convidado da lista e do time deste jogo. */
@@ -180,12 +171,10 @@ export async function removeGuest(fd: FormData) {
   const gameId = str(fd, "game_id");
   const memberId = str(fd, "member_id");
   const supabase = await createClient();
-  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
   if (game?.teams?.length) {
     await supabase.from("games").update({ teams: removeFromTeams(game.teams, memberId) }).eq("id", gameId);
   }
-  // Também sai dos times fixos do mês, onde só convidados entram por aqui.
-  if (game) await putInFixedTeam(supabase, str(fd, "group_id"), monthOf(game.starts_at), memberId, "");
   await clearAttendance(fd);
 }
 
@@ -261,6 +250,7 @@ async function confirmedForGame(groupId: string, gameId: string) {
     apart: await apartPairs(supabase, groupId),
     players: confirmed.map(({ member }) => toDrawPlayer(sport, member)),
     guestIds: new Set(confirmed.filter((e) => e.member.guest).map((e) => e.member.id)),
+    guestTeams: guestTeams(attendances ?? [], members),
   };
 }
 
@@ -284,14 +274,10 @@ async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<Retu
     .order("sort")
     .returns<FixedTeam[]>();
   if (!fixed?.length) return null;
-  // Convidado que já foi posto num time continua nele.
-  const guestTeam = new Map<string, string>();
+  // Convidado vai no time escolhido para ele neste jogo; se já estava num time do jogo, continua nele.
+  const guestTeam = new Map(data.guestTeams);
   for (const t of data.game.teams ?? []) for (const p of t.players) if (data.guestIds.has(p.member_id)) guestTeam.set(p.member_id, t.name);
-  const withGuests = fixed.map((t) => ({
-    ...t,
-    member_ids: [...t.member_ids, ...[...guestTeam].filter(([, name]) => name === t.name).map(([id]) => id)],
-  }));
-  return teamsFromFixed(withGuests, data.players, data.apart);
+  return teamsFromFixed(withGuestTeams(fixed, guestTeam), data.players, data.apart);
 }
 
 /** Monta os times do jogo com os times fixos do mês. */

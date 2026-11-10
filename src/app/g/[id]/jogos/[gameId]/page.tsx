@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
-import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
+import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/fixed-teams";
 import { sportOf } from "@/lib/sports";
 import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
@@ -95,7 +95,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
       .returns<Pick<FixedTeam, "name" | "member_ids">[]>();
     if (fixed?.length) {
       const sport = sportOf(group.sport);
-      const teams = teamsFromFixed(fixed, played.map((m) => toDrawPlayer(sport, m)));
+      const withGuests = withGuestTeams(fixed, guestTeams(attendances ?? [], members));
+      const teams = teamsFromFixed(withGuests, played.map((m) => toDrawPlayer(sport, m)));
       if (teams.length >= 2) fixedTeams = teams;
     }
   }
