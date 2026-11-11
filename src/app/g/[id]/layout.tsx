@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { BillingBanner } from "@/components/billing-banner";
 import { GroupTabs } from "@/components/group-tabs";
 import { getGroupContext } from "@/lib/groups";
+import { asaasEnabled } from "@/lib/asaas";
 import { WEEKDAYS } from "@/lib/format";
 import { rankingOf } from "@/lib/standings";
 
@@ -18,7 +19,9 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
           {group.location && ` · ${group.location}`}
         </p>
       </div>
-      <BillingBanner state={subscription} paidUntil={group.paid_until} organizer={isOrganizer} groupName={group.name} />
+      <BillingBanner state={subscription} paidUntil={group.paid_until} organizer={isOrganizer} groupName={group.name}
+        payHref={asaasEnabled() ? `/g/${group.id}/config#assinatura` : undefined}
+      />
       <GroupTabs
         groupId={group.id}
         organizer={isOrganizer}

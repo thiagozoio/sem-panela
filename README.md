@@ -103,6 +103,16 @@ O e-mail padrão do Supabase tem limite baixo de envios por hora; para produçã
 
 **Entrar com Google.** Crie um *OAuth Client ID* (tipo *Web application*) no Google Cloud Console com a URI de redirecionamento `https://<projeto>.supabase.co/auth/v1/callback`, cole o Client ID e o Secret em **Authentication > Providers > Google** no Supabase e ponha `NEXT_PUBLIC_GOOGLE_LOGIN=1` na Vercel.
 
+## Cobrança automática (Asaas)
+
+Sem `ASAAS_API_KEY` o app continua com o Pix manual (`NEXT_PUBLIC_BILLING_PIX_KEY` e o "+1 mês" no `/admin`). Para ligar:
+
+1. Rode `supabase/migrations/20261108120000_cobranca_asaas.sql` no SQL Editor.
+2. No Asaas (comece pelo sandbox, https://sandbox.asaas.com): **Integrações > Chaves de API** e gere a chave. Na Vercel: `ASAAS_API_KEY` (a chave) e `ASAAS_WEBHOOK_TOKEN` (uma senha longa que você inventa). `SUPABASE_SECRET_KEY` e `CRON_SECRET` também precisam estar lá.
+3. No Asaas: **Integrações > Webhooks > Adicionar**: URL `https://<seu-dominio>/api/webhooks/asaas`, token = o mesmo `ASAAS_WEBHOOK_TOKEN`, fila sequencial, eventos de **Cobranças** e **Assinaturas**.
+
+Como funciona: em **Ajustes**, o organizador informa nome e CPF/CNPJ e escolhe Pix ou cartão. O app cria o cliente e a assinatura mensal no Asaas (primeiro vencimento = o "pago até" atual) e abre a página de pagamento. Quando o Asaas avisa `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED`, `billing_apply_payment` empurra o `paid_until` um mês (uma vez por cobrança, mesmo com aviso repetido); estorno e contestação desfazem. Uma rotina diária (`/api/cron/cobranca`) confere no Asaas as cobranças pagas e aplica as que algum aviso perdeu. A chave de produção (`$aact_prod_...`) troca o endereço da API sozinha.
+
 ## Deploy na Vercel
 
 1. Importe o repositório na Vercel (região `gru1`, São Paulo, em *Settings > Functions*).
@@ -119,5 +129,5 @@ src/app/               telas (App Router) e server actions
 ```
 
 ## Próximos passos (fora do MVP)
-- Cobrança automática da assinatura pelo Asaas (o campo `paid_until` já é o ponto de integração: o webhook só precisa atualizá-lo).
+- Plano anual e Pix Automático no Asaas (precisa de CNPJ com 6 meses).
 - Pix da turma com baixa automática.
