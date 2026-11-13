@@ -43,6 +43,8 @@ export type Championship = {
 export type ResultGame = Pick<Game, "starts_at" | "teams" | "scores"> & {
   id?: string;
   game_goals?: Pick<GameGoal, "member_id" | "goals">[];
+  /** Presenças do jogo: quem está com "não vai" / "não jogou" não conta nos times. */
+  attendances?: { member_id: string; going: boolean }[];
 };
 
 export type Row = {
@@ -62,6 +64,18 @@ export const points = (r: Row) => r.wins * 3 + r.draws;
 
 /** Dia (AAAA-MM-DD) do jogo no fuso de São Paulo. */
 export const gameDay = (g: Pick<Game, "starts_at">) => todayInBrazil(new Date(g.starts_at));
+
+/**
+ * Times do jogo só com quem jogou: sai quem está nos times salvos mas ficou com
+ * "não vai" (desmarcou depois do sorteio) ou foi marcado como "não jogou".
+ * Sem as presenças carregadas, os times ficam como estão.
+ */
+export function playedTeams(g: Pick<ResultGame, "teams" | "attendances">): Game["teams"] {
+  if (!g.teams || !g.attendances) return g.teams;
+  const out = new Set(g.attendances.filter((a) => !a.going).map((a) => a.member_id));
+  if (!out.size) return g.teams;
+  return g.teams.map((t) => ({ ...t, players: t.players.filter((p) => !out.has(p.member_id)) }));
+}
 
 /** Só conta jogo com 2 times ou mais e placar de todos eles. */
 export function hasResult(g: ResultGame): g is ResultGame & { teams: NonNullable<Game["teams"]>; scores: number[] } {
@@ -122,7 +136,7 @@ export function standings(
     if (!hasResult(g)) continue;
     const result = outcomes(g.scores);
     const fixed = fixedNames(monthOf(g.starts_at));
-    g.teams.forEach((team, i) => {
+    playedTeams(g)!.forEach((team, i) => {
       for (const p of team.players) {
         const row = players.get(p.member_id) ?? emptyRow(p.member_id, nameOf(p.member_id, p.name));
         add(row, result[i]);
@@ -271,7 +285,7 @@ export function decideChampion(
     const winner = result.findIndex((o) => o.result === "V");
     if (winner < 0) return { champions: [], pending: "empate" };
     return {
-      champions: finalGame.teams[winner].players.map((p) => emptyRow(p.member_id, nameOf(p.member_id, p.name))),
+      champions: playedTeams(finalGame)![winner].players.map((p) => emptyRow(p.member_id, nameOf(p.member_id, p.name))),
       pending: null,
     };
   }

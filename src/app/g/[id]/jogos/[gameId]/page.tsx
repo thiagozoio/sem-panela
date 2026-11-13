@@ -59,6 +59,10 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const goalList = scorers(goals ?? [], nameOf);
   const ownGoalList = ownGoalScorers(goals ?? [], nameOf);
   const playedIds = new Set(played.map((m) => m.id));
+  // Times do jogo só com quem jogou (quem desmarcou depois do sorteio não aparece).
+  const lineupTeams = game.teams
+    ?.map((t) => ({ name: t.name, players: t.players.filter((p) => playedIds.has(p.member_id)) }))
+    .filter((t) => t.players.length > 0);
   const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => playedIds.has(r.member_id)));
   const mvpVotes = rankMvpVotes(((mvpRows ?? []) as MvpSummary[]).filter((v) => playedIds.has(v.member_id)));
   const mvpOn = mvpRows !== null; // a votação existe no banco
@@ -146,6 +150,37 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           )
         )}
 
+        {started && played.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold">Quem jogou</h3>
+            {lineupTeams ? (
+              <div className="mt-1 grid grid-cols-2 gap-3 text-sm">
+                {lineupTeams.map((t) => (
+                  <div key={t.name}>
+                    <p className="font-medium text-pitch-900">{t.name}</p>
+                    <ul className="text-neutral-700">
+                      {t.players.map((p) => (
+                        <li key={p.member_id}>{nameOf(p.member_id)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-700">{played.map((m) => m.name).join(", ")}</p>
+            )}
+            {canEditResult && (
+              <p className="mt-1 text-xs text-neutral-500">
+                Alguém aí não jogou? Marque &quot;Não jogou&quot; em{" "}
+                <a href="#quem-jogou" className="text-pitch-700 underline">
+                  Corrigir quem jogou
+                </a>
+                .
+              </p>
+            )}
+          </div>
+        )}
+
         {(goalList.length > 0 || ownGoalList.length > 0) && (
           <div>
             <h3 className="text-sm font-semibold">Gols</h3>
@@ -198,7 +233,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
 
       {canEditResult && started && (
         <Card>
-          <details>
+          <details id="quem-jogou">
             <summary className="cursor-pointer font-semibold">Corrigir quem jogou</summary>
             <form action={saveLineup} className="mt-3 space-y-3">
               <input type="hidden" name="game_id" value={game.id} />
