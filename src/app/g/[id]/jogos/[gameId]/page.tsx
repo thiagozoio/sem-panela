@@ -243,10 +243,15 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
                 {game.teams ? " e nos times" : " e na cobrança de avulso"}. Ninguém recebe aviso.
               </p>
               <ul className="divide-y divide-neutral-100">
-                {lineup.map((m) => {
+                {lineup.map((m, i) => {
                   const playing = playedIds.has(m.id);
                   return (
-                    <li key={m.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                    <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                      {!playing && i === played.length && (
+                        <p className="w-full pt-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                          Não jogaram (resto do grupo, para incluir quem veio)
+                        </p>
+                      )}
                       <span className={playing ? "" : "text-neutral-500"}>
                         {m.name}
                         {m.guest && <span className="text-xs text-neutral-400"> (convidado)</span>}
