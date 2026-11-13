@@ -816,7 +816,7 @@ export async function buildFinalTeams(fd: FormData) {
     supabase.from("championships").select("*").eq("group_id", groupId).returns<Championship[]>(),
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores")
+      .select("id, starts_at, teams, scores, attendances(member_id, going)")
       .eq("group_id", groupId)
       .not("scores", "is", null)
       .returns<ResultGame[]>(),

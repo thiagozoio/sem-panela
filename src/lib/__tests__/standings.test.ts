@@ -242,3 +242,23 @@ describe("final e campeão à mão", () => {
     ]);
   });
 });
+
+describe("quem não jogou fica fora da tabela", () => {
+  it("ignora quem está nos times mas ficou com 'não vai'", () => {
+    const g = {
+      ...game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "felipe"], ["c"]], [2, 1]),
+      attendances: [
+        { member_id: "a", going: true },
+        { member_id: "felipe", going: false },
+        { member_id: "c", going: true },
+      ],
+    };
+    const keys = standings([g], nameOf).players.map((r) => r.key);
+    expect(keys).toEqual(["a", "c"]);
+  });
+
+  it("sem presenças carregadas, conta os times como estão", () => {
+    const g = game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "felipe"], ["c"]], [2, 1]);
+    expect(standings([g], nameOf).players).toHaveLength(3);
+  });
+});

@@ -12,7 +12,7 @@ export async function loadRanking(groupId: string) {
   const [{ data: games }, { data: fixed }, { data: championships }] = await Promise.all([
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores, game_goals(member_id, goals)")
+      .select("id, starts_at, teams, scores, game_goals(member_id, goals), attendances(member_id, going)")
       .eq("group_id", group.id)
       .not("scores", "is", null)
       .lte("starts_at", new Date().toISOString())
