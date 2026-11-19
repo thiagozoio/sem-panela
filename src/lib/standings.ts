@@ -56,11 +56,19 @@ export type Row = {
   losses: number;
   goalsFor: number;
   goalsAgainst: number;
+  /** Resultado de cada jogo, do mais antigo ao mais recente (forma recente). */
+  form: Outcome[];
 };
+
+export type Outcome = "V" | "E" | "D";
 
 export const goalDiff = (r: Row) => r.goalsFor - r.goalsAgainst;
 /** 3 pontos por vitória e 1 por empate, como no Brasileirão (vale para o vôlei também). */
 export const points = (r: Row) => r.wins * 3 + r.draws;
+/** Aproveitamento: pontos ganhos sobre os pontos possíveis (0 a 100). */
+export const winRate = (r: Row) => (r.played ? Math.round((points(r) / (r.played * 3)) * 100) : 0);
+/** Os últimos `n` resultados, do mais antigo ao mais recente. */
+export const recentForm = (r: Row, n = 5) => r.form.slice(-n);
 
 /** Dia (AAAA-MM-DD) do jogo no fuso de São Paulo. */
 export const gameDay = (g: Pick<Game, "starts_at">) => todayInBrazil(new Date(g.starts_at));
@@ -87,7 +95,7 @@ export function hasResult(g: ResultGame): g is ResultGame & { teams: NonNullable
  * quem fez mais gols vence (empate se dividir o topo) e os outros perdem,
  * e os gols contra são a soma dos gols dos outros times.
  */
-export function outcomes(scores: number[]): { result: "V" | "E" | "D"; goalsFor: number; goalsAgainst: number }[] {
+export function outcomes(scores: number[]): { result: Outcome; goalsFor: number; goalsAgainst: number }[] {
   const total = scores.reduce((a, b) => a + b, 0);
   const top = Math.max(...scores);
   const leaders = scores.filter((s) => s === top).length;
@@ -99,11 +107,12 @@ export function outcomes(scores: number[]): { result: "V" | "E" | "D"; goalsFor:
 }
 
 function emptyRow(key: string, name: string): Row {
-  return { key, name, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
+  return { key, name, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, form: [] };
 }
 
 function add(row: Row, o: ReturnType<typeof outcomes>[number]) {
   row.played++;
+  row.form.push(o.result);
   if (o.result === "V") row.wins++;
   else if (o.result === "E") row.draws++;
   else row.losses++;
@@ -156,6 +165,16 @@ export function standings(
 export function leaders(rows: Row[]): Row[] {
   if (!rows.length) return [];
   return rows.filter((r) => tiebreak(r, rows[0]) === 0);
+}
+
+/**
+ * Posição de cada linha na tabela já ordenada: quem empata em todos os critérios
+ * divide a posição (1, 1, 3...).
+ */
+export function positions(rows: Row[]): number[] {
+  const out: number[] = [];
+  rows.forEach((r, i) => out.push(i > 0 && tiebreak(r, rows[i - 1]) === 0 ? out[i - 1] : i + 1));
+  return out;
 }
 
 /** Artilharia: gols de cada jogador nos jogos dados, do maior para o menor. */

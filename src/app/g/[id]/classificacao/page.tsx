@@ -25,6 +25,7 @@ import { buildFinalTeams, createSeason, deleteChampionship } from "../actions";
 import { FinalForm } from "./final-form";
 import { ChampionshipForm } from "./championship-form";
 import { loadRanking } from "./data";
+import { Podium } from "./podium";
 import { Legend, StandingsTable } from "./standings-table";
 
 export const metadata: Metadata = { title: "Classificação" };
@@ -134,6 +135,8 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
               <h2 className="text-lg font-bold">{title}</h2>
             </div>
 
+            {table.players.length >= 2 && <Podium rows={table.players} finished={finished && decidedBy === "tabela"} />}
+
             {decision && decidedBy !== "tabela" ? (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {decision.champions.length > 0 ? (
@@ -157,17 +160,24 @@ export default async function RankingPage({ params, searchParams }: PageProps<"/
                 )}
               </p>
             ) : topPlayers.length > 0 ? (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                {finished ? "🏆 Campeão: " : "Liderando: "}
-                <strong>{names(topPlayers)}</strong>
-                {topTeams.length > 0 && (
-                  <>
-                    <br />
-                    {finished ? "🏆 Time campeão: " : "Time liderando: "}
-                    <strong>{names(topTeams)}</strong>
-                  </>
-                )}
-              </p>
+              // Com o pódio na tela, "Liderando: fulano" repetiria o 1º lugar; fica só o campeão e o time.
+              (finished || topTeams.length > 0 || table.players.length < 2) && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {(finished || table.players.length < 2) && (
+                    <>
+                      {finished ? "🏆 Campeão: " : "Liderando: "}
+                      <strong>{names(topPlayers)}</strong>
+                    </>
+                  )}
+                  {topTeams.length > 0 && (
+                    <>
+                      {(finished || table.players.length < 2) && <br />}
+                      {finished ? "🏆 Time campeão: " : "Time liderando: "}
+                      <strong>{names(topTeams)}</strong>
+                    </>
+                  )}
+                </p>
+              )
             ) : (
               <p className="text-sm text-neutral-500">
                 {notStarted
