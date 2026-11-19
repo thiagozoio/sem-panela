@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyLiveGoal, opponents } from "../live";
+import { applyLiveGoal, liveOpenForPlayers, opponents } from "../live";
 import type { Position, Team } from "../types";
 
 const p = (member_id: string) => ({ member_id, name: member_id, position: "linha" as Position });
@@ -44,5 +44,20 @@ describe("applyLiveGoal", () => {
 
   it("jogo sem times só conta os gols de cada um", () => {
     expect(applyLiveGoal({ scores: null, goals: {}, ownGoals: {} }, null, 1, { memberId: "x" })).toEqual({ scores: null, goals: { x: 1 }, ownGoals: {} });
+  });
+});
+
+describe("liveOpenForPlayers", () => {
+  const start = "2026-11-19T22:00:00.000Z";
+  const at = (iso: string) => new Date(iso).getTime();
+  it("fecha antes do jogo começar", () => {
+    expect(liveOpenForPlayers(start, at("2026-11-19T21:59:00.000Z"))).toBe(false);
+  });
+  it("abre no horário do jogo e nas 3 horas seguintes", () => {
+    expect(liveOpenForPlayers(start, at(start))).toBe(true);
+    expect(liveOpenForPlayers(start, at("2026-11-20T00:59:00.000Z"))).toBe(true);
+  });
+  it("fecha 3 horas depois do início", () => {
+    expect(liveOpenForPlayers(start, at("2026-11-20T01:00:00.000Z"))).toBe(false);
   });
 });

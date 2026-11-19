@@ -1,6 +1,19 @@
 import type { Team } from "./types";
 
 /**
+ * Durante o jogo, qualquer jogador do grupo marca os gols ao vivo: do horário do jogo
+ * até PLAYERS_LIVE_HOURS depois (o mesmo tempo que a home mostra o jogo). Depois disso,
+ * só o organizador mexe (corrige).
+ */
+export const PLAYERS_LIVE_HOURS = 3;
+
+/** O jogo começou e ainda está na janela em que todos podem marcar gols. */
+export function liveOpenForPlayers(startsAt: string, now = Date.now()): boolean {
+  const start = new Date(startsAt).getTime();
+  return now >= start && now < start + PLAYERS_LIVE_HOURS * 3600_000;
+}
+
+/**
  * Estado do placar ao vivo: gols por time (na ordem dos times), gols por jogador
  * e gols contra por jogador.
  */
