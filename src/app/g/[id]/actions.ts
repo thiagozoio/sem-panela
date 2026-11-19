@@ -27,7 +27,8 @@ import {
 } from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
-import { applyLiveGoal, type LiveState, type LiveTarget } from "@/lib/live";
+import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } from "@/lib/live";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -235,9 +236,14 @@ export async function removeApartRule(fd: FormData) {
 async function confirmedForGame(groupId: string, gameId: string) {
   const ctx = await getGroupContext(groupId);
   if (!ctx.isOrganizer) return null;
+  return gameData(ctx, gameId);
+}
+
+/** O jogo, os confirmados e o resto que o sorteio e o placar precisam (lido como o usuário, pela RLS). */
+async function gameData(ctx: Awaited<ReturnType<typeof getGroupContext>>, gameId: string) {
   const { supabase, group, members } = ctx;
   const [{ data: game }, { data: attendances }] = await Promise.all([
-    supabase.from("games").select("*").eq("id", gameId).single<Game>(),
+    supabase.from("games").select("*").eq("id", gameId).eq("group_id", group.id).single<Game>(),
     supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>(),
   ]);
   if (!game) return null;
@@ -247,7 +253,7 @@ async function confirmedForGame(groupId: string, gameId: string) {
     supabase,
     game,
     userId: ctx.user.id,
-    apart: await apartPairs(supabase, groupId),
+    apart: await apartPairs(supabase, group.id),
     players: confirmed.map(({ member }) => toDrawPlayer(sport, member)),
     guestIds: new Set(confirmed.filter((e) => e.member.guest).map((e) => e.member.id)),
     guestTeams: guestTeams(attendances ?? [], members),
@@ -265,7 +271,7 @@ export async function drawTeamsAction(fd: FormData) {
 }
 
 /** Times do jogo montados com os times fixos do mês (null se o mês não tem times fixos). */
-async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<ReturnType<typeof confirmedForGame>>>) {
+async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<ReturnType<typeof gameData>>>) {
   const { data: fixed } = await data.supabase
     .from("fixed_teams")
     .select("*")
@@ -348,7 +354,9 @@ export async function saveResult(fd: FormData) {
 }
 
 /**
- * Placar ao vivo: um gol a mais ou a menos, salvo na hora. Com memberId mexe nos gols
+ * Placar ao vivo: um gol a mais ou a menos, salvo na hora. O organizador marca e corrige
+ * quando quiser; qualquer jogador do grupo marca só durante o jogo (liveOpenForPlayers).
+ * Com memberId mexe nos gols
  * do jogador e no placar do time dele; com ownGoal + team é gol contra do jogador, que
  * vai para o time `team`; só com team é gol sem autor, só no placar.
  * Jogo sem times salvos mas com times fixos no mês: os times fixos viram os times do jogo.
@@ -364,10 +372,22 @@ export async function liveGoal(input: {
 }): Promise<LiveState | null> {
   const { groupId, gameId } = input;
   const delta = input.delta === -1 ? -1 : 1;
-  const data = await confirmedForGame(groupId, gameId);
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.me || ctx.readOnly) return null;
+  const data = await gameData(ctx, gameId);
   if (!data || data.game.group_id !== groupId) return null;
-  const { supabase, game } = data;
+  const { game } = data;
   if (new Date(game.starts_at).getTime() > Date.now()) return null;
+  // A RLS só deixa o organizador gravar gols e placar. Para o jogador, durante o jogo, o
+  // servidor confere tudo aqui (é do grupo, grupo em dia, jogo do grupo rolando) e grava
+  // com a chave secreta, só neste jogo e só nos gols e no placar.
+  let supabase: Pick<typeof ctx.supabase, "from"> = ctx.supabase;
+  if (!ctx.isOrganizer) {
+    if (!liveOpenForPlayers(game.starts_at)) return null;
+    const admin = createAdminClient();
+    if (!admin) return null;
+    supabase = admin;
+  }
 
   let teams = game.teams;
   let teamsUpdate = {};
@@ -429,7 +449,8 @@ export async function liveGoal(input: {
     const { error } = await supabase
       .from("games")
       .update({ scores: next.scores, ...teamsUpdate })
-      .eq("id", gameId);
+      .eq("id", gameId)
+      .eq("group_id", groupId);
     if (error) return null;
   }
   return next;

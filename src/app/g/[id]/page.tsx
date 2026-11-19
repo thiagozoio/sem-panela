@@ -18,6 +18,7 @@ import { OrganizerPush } from "./organizer-push";
 import { GuestForm } from "./guest-form";
 import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, removeGuest, setAttendance } from "./actions";
 import { plays, regularPlayer } from "@/lib/members";
+import { liveOpenForPlayers } from "@/lib/live";
 
 export default async function GamePage({ params, searchParams }: PageProps<"/g/[id]">) {
   const { id } = await params;
@@ -106,7 +107,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
           </Badge>
         </div>
 
-        {isOrganizer && !readOnly && hasStarted(game.starts_at) && (
+        {me && !readOnly && hasStarted(game.starts_at) && (isOrganizer || liveOpenForPlayers(game.starts_at)) && (
           <LinkButton href={`/g/${group.id}/jogos/${game.id}#ao-vivo`} className="w-full">
             ⚽ Jogo rolando: marcar gols ao vivo
           </LinkButton>

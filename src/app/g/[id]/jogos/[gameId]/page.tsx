@@ -12,6 +12,7 @@ import { sportOf } from "@/lib/sports";
 import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
+import { liveOpenForPlayers } from "@/lib/live";
 import { LiveGoals } from "./live-goals";
 
 export const metadata: Metadata = { title: "Resultado" };
@@ -85,11 +86,14 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0 || ownGoalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
+  // Durante o jogo, todo mundo do grupo marca gols ao vivo; depois, só o organizador corrige.
+  const playersLive = !!me && !readOnly && liveOpenForPlayers(game.starts_at);
+  const canMarkLive = canEditResult || playersLive;
 
   // Jogo sem times salvos (não teve sorteio): se o mês tem times fixos, o placar
   // é anotado com eles, e ao salvar eles viram os times do jogo.
   let fixedTeams: Game["teams"] = null;
-  if (canEditResult && started && !game.teams) {
+  if (canMarkLive && started && !game.teams) {
     const { data: fixed } = await supabase
       .from("fixed_teams")
       .select("name, member_ids")
@@ -214,12 +218,20 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         )}
       </Card>
 
-      {canEditResult && started && (
+      {canMarkLive && started && (
         <Card>
           <details open={live} id="ao-vivo">
             <summary className="cursor-pointer font-semibold">⚽ Marcar gols ao vivo</summary>
-            <div className="mt-3">
+            <div className="mt-3 space-y-3">
+              <p className="text-xs text-neutral-500">
+                {canEditResult
+                  ? playersLive
+                    ? "Durante o jogo qualquer jogador do grupo também pode marcar. Depois, só os organizadores corrigem."
+                    : "Os jogadores já não marcam mais. Só os organizadores corrigem."
+                  : "Qualquer um do grupo pode marcar durante o jogo. Combinem quem marca para não contar o mesmo gol duas vezes. Depois do jogo, só o organizador corrige."}
+              </p>
               <LiveGoals
+                poll={playersLive}
                 groupId={group.id}
                 gameId={game.id}
                 teams={liveTeams}
