@@ -8,11 +8,14 @@ import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/fixed-teams";
-import { sportOf } from "@/lib/sports";
+import { positionInfo, positionRank, sportOf } from "@/lib/sports";
+import { outcomes } from "@/lib/standings";
+import { teamColors } from "@/lib/team-colors";
 import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
 import { LiveGoals } from "./live-goals";
+import { Scoreboard, TeamRosters, type BoardTeam } from "./scoreboard";
 
 export const metadata: Metadata = { title: "Resultado" };
 
@@ -59,10 +62,6 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   const goalList = scorers(goals ?? [], nameOf);
   const ownGoalList = ownGoalScorers(goals ?? [], nameOf);
   const playedIds = new Set(played.map((m) => m.id));
-  // Times do jogo só com quem jogou (quem desmarcou depois do sorteio não aparece).
-  const lineupTeams = game.teams
-    ?.map((t) => ({ name: t.name, players: t.players.filter((p) => playedIds.has(p.member_id)) }))
-    .filter((t) => t.players.length > 0);
   const ranking = rankRatings(((summary ?? []) as RatingSummary[]).filter((r) => playedIds.has(r.member_id)));
   const mvpVotes = rankMvpVotes(((mvpRows ?? []) as MvpSummary[]).filter((v) => playedIds.has(v.member_id)));
   const mvpOn = mvpRows !== null; // a votação existe no banco
@@ -82,6 +81,38 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
     : best
       ? { name: nameOf(best.member_id), detail: `nota ${Number(best.average).toFixed(1).replace(".", ",")}` }
       : null;
+  const craqueIds = new Set(winners.length ? winners.map((w) => w.member_id) : best ? [best.member_id] : []);
+
+  // Placar visual e elenco em fichas: cada time com a cor do nome (ou da paleta) e o resultado.
+  const sport = sportOf(group.sport);
+  const results = game.teams && game.scores?.length === game.teams.length ? outcomes(game.scores) : null;
+  const colors = teamColors(game.teams?.map((t) => t.name) ?? []);
+  const boardTeams: BoardTeam[] =
+    game.teams?.map((t, i) => ({
+      name: t.name,
+      color: colors[i],
+      score: game.scores?.[i] ?? null,
+      result: results?.[i].result ?? null,
+      players: t.players
+        .filter((p) => playedIds.has(p.member_id))
+        .sort((a, b) => positionRank(sport, a.position) - positionRank(sport, b.position) || nameOf(a.member_id).localeCompare(nameOf(b.member_id), "pt-BR"))
+        .map((p) => ({
+          id: p.member_id,
+          name: nameOf(p.member_id),
+          short: positionInfo(sport, p.position)?.short ?? "",
+          goals: goalsOf.get(p.member_id) ?? 0,
+          ownGoals: ownGoalsOf.get(p.member_id) ?? 0,
+          guest: !!byId.get(p.member_id)?.guest,
+          craque: craqueIds.has(p.member_id),
+        })),
+    })) ?? [];
+  const rosterTeams = boardTeams.filter((t) => t.players.length > 0);
+  // Gols de quem está nas fichas já aparecem nelas; a lista mostra só o resto.
+  const inChips = new Set(rosterTeams.flatMap((t) => t.players.map((p) => p.id)));
+  const showRosters = started && rosterTeams.length > 0;
+  const looseGoals = showRosters ? (goals ?? []).filter((g) => !inChips.has(g.member_id)) : (goals ?? []);
+  const goalLines = scorers(looseGoals, nameOf);
+  const ownGoalLines = ownGoalScorers(looseGoals, nameOf);
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0 || ownGoalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
@@ -98,7 +129,6 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
       .order("sort")
       .returns<Pick<FixedTeam, "name" | "member_ids">[]>();
     if (fixed?.length) {
-      const sport = sportOf(group.sport);
       const withGuests = withGuestTeams(fixed, guestTeams(attendances ?? [], members));
       const teams = teamsFromFixed(withGuests, played.map((m) => toDrawPlayer(sport, m)));
       if (teams.length >= 2) fixedTeams = teams;
@@ -133,15 +163,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
         </div>
 
-        {game.teams && game.scores?.length ? (
-          <div className="flex flex-wrap justify-center gap-3 text-center">
-            {game.teams.map((t, i) => (
-              <div key={t.name} className="min-w-24 rounded-xl bg-pitch-50 px-3 py-2">
-                <p className="text-sm font-semibold text-pitch-900">{t.name}</p>
-                <p className="text-3xl font-extrabold">{game.scores?.[i] ?? 0}</p>
-              </div>
-            ))}
-          </div>
+        {results ? (
+          <Scoreboard teams={boardTeams} />
         ) : (
           !hasResult && (
             <p className="text-sm text-neutral-500">
@@ -151,26 +174,17 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         )}
 
         {started && played.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold">Quem jogou</h3>
-            {lineupTeams ? (
-              <div className="mt-1 grid grid-cols-2 gap-3 text-sm">
-                {lineupTeams.map((t) => (
-                  <div key={t.name}>
-                    <p className="font-medium text-pitch-900">{t.name}</p>
-                    <ul className="text-neutral-700">
-                      {t.players.map((p) => (
-                        <li key={p.member_id}>{nameOf(p.member_id)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+          <div className={showRosters ? "border-t border-neutral-100 pt-3" : ""}>
+            {showRosters ? (
+              <TeamRosters teams={rosterTeams} />
             ) : (
-              <p className="text-sm text-neutral-700">{played.map((m) => m.name).join(", ")}</p>
+              <>
+                <h3 className="text-sm font-semibold">Quem jogou</h3>
+                <p className="text-sm text-neutral-700">{played.map((m) => m.name).join(", ")}</p>
+              </>
             )}
             {canEditResult && (
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-2 text-xs text-neutral-500">
                 Alguém aí não jogou? Marque &quot;Não jogou&quot; em{" "}
                 <a href="#quem-jogou" className="text-pitch-700 underline">
                   Corrigir quem jogou
@@ -181,17 +195,17 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           </div>
         )}
 
-        {(goalList.length > 0 || ownGoalList.length > 0) && (
+        {(goalLines.length > 0 || ownGoalLines.length > 0) && (
           <div>
             <h3 className="text-sm font-semibold">Gols</h3>
             <ul className="text-sm">
-              {goalList.map((g) => (
+              {goalLines.map((g) => (
                 <li key={g.name}>
                   ⚽ {g.name}
                   {g.goals > 1 && <span className="text-neutral-500"> ({g.goals})</span>}
                 </li>
               ))}
-              {ownGoalList.map((g) => (
+              {ownGoalLines.map((g) => (
                 <li key={`contra-${g.name}`}>
                   ⚽ {g.name} <span className="text-neutral-500">{ownGoalLabel(g.goals)}</span>
                 </li>
