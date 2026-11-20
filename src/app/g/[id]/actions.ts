@@ -22,6 +22,7 @@ import {
   standings,
   tableGames,
   turnsOf,
+  withoutGuests,
   type Championship,
   type ResultGame,
 } from "@/lib/standings";
@@ -849,7 +850,8 @@ export async function buildFinalTeams(fd: FormData) {
   const byId = new Map(members.map((m) => [m.id, m]));
   const nameOf = (id: string, fallback: string) => byId.get(id)?.name ?? fallback;
   const finals = finalGameIds(list ?? []);
-  const [first, second] = turns.map((t) => standings(tableGames(games ?? [], t, finals), nameOf).players);
+  const noGuests = withoutGuests(games ?? [], new Set(members.filter((m) => m.guest).map((m) => m.id)));
+  const [first, second] = turns.map((t) => standings(tableGames(noGuests, t, finals), nameOf).players);
   const ids = finalTeamIds(first, second, group.players_per_team);
   const sport = sportOf(group.sport);
   const teams = turns.map((t, i) => ({

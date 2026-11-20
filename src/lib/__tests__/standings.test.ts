@@ -277,3 +277,14 @@ describe("quem não jogou fica fora da tabela", () => {
     expect(standings([g], nameOf).players).toHaveLength(3);
   });
 });
+
+describe("convidado não entra na tabela", () => {
+  it("tira o convidado dos times e da artilharia, mas o placar fica", async () => {
+    const { withoutGuests } = await import("../standings");
+    const g = { ...game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "conv"], ["c"]], [2, 1]), game_goals: [{ member_id: "conv", goals: 2 }] };
+    const games = withoutGuests([g], new Set(["conv"]));
+    expect(standings(games, nameOf).players.map((r) => r.key)).toEqual(["a", "c"]);
+    expect(standings(games, nameOf).players[0].goalsFor).toBe(2);
+    expect(topScorers(games, (id) => id)).toEqual([]);
+  });
+});
