@@ -107,7 +107,7 @@ O e-mail padrão do Supabase tem limite baixo de envios por hora; para produçã
 
 Sem `ASAAS_API_KEY` o app continua com o Pix manual (`NEXT_PUBLIC_BILLING_PIX_KEY` e o "+1 mês" no `/admin`). Para ligar:
 
-1. Rode `supabase/migrations/20261108120000_cobranca_asaas.sql` no SQL Editor.
+1. Rode `supabase/migrations/20261120000000_cobranca_asaas.sql` no SQL Editor.
 2. No Asaas (comece pelo sandbox, https://sandbox.asaas.com): **Integrações > Chaves de API** e gere a chave. Na Vercel: `ASAAS_API_KEY` (a chave) e `ASAAS_WEBHOOK_TOKEN` (uma senha longa que você inventa). `SUPABASE_SECRET_KEY` e `CRON_SECRET` também precisam estar lá.
 3. No Asaas: **Integrações > Webhooks > Adicionar**: URL `https://<seu-dominio>/api/webhooks/asaas`, token = o mesmo `ASAAS_WEBHOOK_TOKEN`, fila sequencial, eventos de **Cobranças** e **Assinaturas**.
 

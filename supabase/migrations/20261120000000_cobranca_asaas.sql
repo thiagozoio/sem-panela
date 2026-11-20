@@ -1,6 +1,6 @@
 -- Sem Panela: cobrança automática da assinatura pelo Asaas (Pix ou cartão).
--- Rode no SQL Editor do Supabase depois de 20261106180000_nao_jogam_juntos.sql
--- (pode rodar antes ou depois de 20261108000000_seguranca.sql).
+-- Rode no SQL Editor do Supabase depois de 20261110000000_time_convidado.sql
+-- (independe das anteriores; pode rodar a qualquer momento).
 --
 -- Quem mexe nestas tabelas é só o servidor (chave secreta), pelo botão "Assinar" e pelo
 -- aviso (webhook) do Asaas. O organizador só lê a assinatura do próprio grupo.

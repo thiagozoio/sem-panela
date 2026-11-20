@@ -40,7 +40,7 @@ export async function BillingCard({
     );
   }
 
-  // Antes da migração 20261108120000 a tabela não existe e vem vazio.
+  // Antes da migração 20261120000000 a tabela não existe e vem vazio.
   const { data: account } = await supabase
     .from("billing_accounts")
     .select("*")
