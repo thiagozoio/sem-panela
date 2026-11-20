@@ -72,11 +72,13 @@ npm run lint
 
    ```html
    <h2>Sem Panela ⚽</h2>
-   <p><strong>Não existe senha.</strong> Toque no botão para entrar:</p>
+   <p><strong>Não precisa de senha.</strong> Toque no botão para entrar:</p>
    <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Entrar no Sem Panela</a></p>
    <p>Ou volte para o Sem Panela e digite o código: <strong>{{ .Token }}</strong></p>
    <p>O link e o código valem por 1 hora. Se você não pediu este acesso, ignore este e-mail.</p>
    ```
+
+   **Senha (opcional para o usuário):** quem quiser cria uma senha em *Perfil > Senha* e depois usa "Entrar com senha" no login. Usa o provedor *Email* que já vem ligado no Supabase, sem modelo de e-mail novo: "Esqueci minha senha" manda o mesmo código do *Magic Link* e leva a pessoa ao Perfil para criar outra. Deixe *Secure password change* desligado (padrão), senão trocar a senha pede um código extra.
 
    O link usa `{{ .RedirectTo }}`, então o domínio do app precisa estar em *Redirect URLs* (passo 3); senão o Supabase troca pelo `Site URL` e o link quebra.
 

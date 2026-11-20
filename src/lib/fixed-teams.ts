@@ -1,6 +1,6 @@
 import { apartMap, type ApartPair, type DrawPlayer } from "./draw";
 import { positionOf, type Sport } from "./sports";
-import type { FixedTeam, Member, Team } from "./types";
+import type { Attendance, FixedTeam, Member, Team } from "./types";
 
 /** Jogador no formato do sorteio (posição já ajustada para a modalidade). */
 export const toDrawPlayer = (sport: Sport, member: Member): DrawPlayer => ({
@@ -59,4 +59,24 @@ export function teamsFromFixed(
       name: s.name,
       players: [...s.players].sort(order).map(({ member_id, name, position }) => ({ member_id, name, position })),
     }));
+}
+
+/** Time escolhido para cada convidado neste jogo (presença com time, só de convidados). */
+export function guestTeams(attendances: Pick<Attendance, "member_id" | "team">[], members: Pick<Member, "id" | "guest">[]) {
+  const guests = new Set(members.filter((m) => m.guest).map((m) => m.id));
+  const map = new Map<string, string>();
+  for (const a of attendances) if (a.team && guests.has(a.member_id)) map.set(a.member_id, a.team);
+  return map;
+}
+
+/**
+ * Times fixos do mês com os convidados deste jogo nos times escolhidos para eles.
+ * O convidado só fica no time neste jogo: nada disso é salvo nos times fixos.
+ */
+export function withGuestTeams<T extends Pick<FixedTeam, "name" | "member_ids">>(fixed: T[], guests: Map<string, string>): T[] {
+  if (guests.size === 0) return fixed;
+  return fixed.map((t) => ({
+    ...t,
+    member_ids: [...t.member_ids.filter((id) => !guests.has(id)), ...[...guests].filter(([, name]) => name === t.name).map(([id]) => id)],
+  }));
 }

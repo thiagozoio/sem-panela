@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { teamsFromFixed } from "../fixed-teams";
+import { guestTeams, teamsFromFixed, withGuestTeams } from "../fixed-teams";
 import type { DrawPlayer } from "../draw";
 
 const p = (id: string, skill = 3, position: "linha" | "goleiro" = "linha"): DrawPlayer => ({
@@ -58,5 +58,39 @@ describe("teamsFromFixed", () => {
       [["x", "a1"]],
     );
     expect(teams[1].players.map((q) => q.member_id)).toContain("x");
+  });
+});
+
+describe("convidados nos times fixos", () => {
+  const fixed = [
+    { name: "Azul", member_ids: ["a1"] },
+    { name: "Branco", member_ids: ["b1"] },
+  ];
+
+  it("guestTeams só pega convidados com time", () => {
+    const map = guestTeams(
+      [
+        { member_id: "g1", team: "Azul" },
+        { member_id: "g2", team: null },
+        { member_id: "a1", team: "Branco" },
+      ],
+      [
+        { id: "g1", guest: true },
+        { id: "g2", guest: true },
+        { id: "a1", guest: false },
+      ],
+    );
+    expect([...map]).toEqual([["g1", "Azul"]]);
+  });
+
+  it("põe o convidado no time escolhido sem mexer no original", () => {
+    const out = withGuestTeams(fixed, new Map([["g1", "Branco"]]));
+    expect(out.map((t) => t.member_ids)).toEqual([["a1"], ["b1", "g1"]]);
+    expect(fixed[1].member_ids).toEqual(["b1"]);
+  });
+
+  it("o mesmo convidado pode cair em outro time em outro jogo", () => {
+    expect(withGuestTeams(fixed, new Map([["g1", "Azul"]]))[0].member_ids).toEqual(["a1", "g1"]);
+    expect(withGuestTeams(fixed, new Map([["g1", "Branco"]]))[0].member_ids).toEqual(["a1"]);
   });
 });

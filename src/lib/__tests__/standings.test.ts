@@ -10,6 +10,9 @@ import {
   outcomes,
   points,
   rankingOf,
+  positions,
+  recentForm,
+  winRate,
   decideChampion,
   finalTeamIds,
   turnsOf,
@@ -78,6 +81,18 @@ describe("standings", () => {
   it("usa o nome atual do jogador", () => {
     const { players } = standings(games, (id) => `Jogador ${id}`);
     expect(players[0].name).toBe("Jogador a");
+  });
+
+  it("forma recente, aproveitamento e posições com empate", () => {
+    const { players } = standings(games, nameOf);
+    const [a, b, , d] = players;
+    expect(a.form).toEqual(["V", "E"]);
+    expect(d.form).toEqual(["D", "E"]);
+    expect(recentForm({ ...a, form: ["V", "D", "E", "V", "V", "D"] })).toEqual(["D", "E", "V", "V", "D"]);
+    expect(winRate(a)).toBe(67);
+    expect(winRate({ ...b, played: 0 })).toBe(0);
+    const tie = standings([game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "b"], ["c"]], [1, 0])], nameOf).players;
+    expect(positions(tie)).toEqual([1, 1, 3]);
   });
 
   it("empate em tudo: os dois são líderes", () => {
@@ -235,10 +250,41 @@ describe("final e campeão à mão", () => {
       { ...base, id: "t1", name: "1º turno", ends_on: "2026-06-30" },
     ];
     expect(turnsOf(list[0], list).map((t) => t.id)).toEqual(["t1", "t2"]);
-    const row = (key: string) => ({ key, name: key, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 });
+    const row = (key: string) => ({ key, name: key, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, form: [] });
     expect(finalTeamIds(["a", "b", "c"].map(row), ["b", "d", "e", "f"].map(row), 2)).toEqual([
       ["a", "b"],
       ["d", "e"],
     ]);
+  });
+});
+
+describe("quem não jogou fica fora da tabela", () => {
+  it("ignora quem está nos times mas ficou com 'não vai'", () => {
+    const g = {
+      ...game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "felipe"], ["c"]], [2, 1]),
+      attendances: [
+        { member_id: "a", going: true },
+        { member_id: "felipe", going: false },
+        { member_id: "c", going: true },
+      ],
+    };
+    const keys = standings([g], nameOf).players.map((r) => r.key);
+    expect(keys).toEqual(["a", "c"]);
+  });
+
+  it("sem presenças carregadas, conta os times como estão", () => {
+    const g = game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "felipe"], ["c"]], [2, 1]);
+    expect(standings([g], nameOf).players).toHaveLength(3);
+  });
+});
+
+describe("convidado não entra na tabela", () => {
+  it("tira o convidado dos times e da artilharia, mas o placar fica", async () => {
+    const { withoutGuests } = await import("../standings");
+    const g = { ...game("2026-10-01T23:00:00Z", ["A", "B"], [["a", "conv"], ["c"]], [2, 1]), game_goals: [{ member_id: "conv", goals: 2 }] };
+    const games = withoutGuests([g], new Set(["conv"]));
+    expect(standings(games, nameOf).players.map((r) => r.key)).toEqual(["a", "c"]);
+    expect(standings(games, nameOf).players[0].goalsFor).toBe(2);
+    expect(topScorers(games, (id) => id)).toEqual([]);
   });
 });

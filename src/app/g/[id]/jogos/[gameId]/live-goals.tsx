@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { applyLiveGoal, opponents, type LiveState, type LiveTarget } from "@/lib/live";
 import type { Team } from "@/lib/types";
@@ -13,12 +13,15 @@ type Player = { id: string; name: string };
  * "−" desfaz. Os toques vão para o servidor um de cada vez, na ordem, para nenhum se perder.
  */
 export function LiveGoals({
+  poll = false,
   groupId,
   gameId,
   teams,
   players,
   initial,
 }: {
+  /** Vários marcando ao mesmo tempo: atualiza sozinho para ver os gols que os outros marcaram. */
+  poll?: boolean;
   groupId: string;
   gameId: string;
   /** Times do placar (do jogo ou os fixos do mês). Sem times, só conta os gols de cada um. */
@@ -34,6 +37,24 @@ export function LiveGoals({
   const queue = useRef(Promise.resolve());
   const confirmed = useRef(initial);
   const inFlight = useRef(0);
+  // Chegou placar novo do servidor (gol marcado por outra pessoa) e não tem toque nosso pendente.
+  const initialKey = JSON.stringify(initial);
+  const [seenKey, setSeenKey] = useState(initialKey);
+  if (initialKey !== seenKey && pending === 0) {
+    setSeenKey(initialKey);
+    setState(initial);
+  }
+  useEffect(() => {
+    if (pending === 0) confirmed.current = initial;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialKey, pending]);
+  useEffect(() => {
+    if (!poll) return;
+    const id = setInterval(() => {
+      if (inFlight.current === 0 && document.visibilityState === "visible") router.refresh();
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [poll, router]);
   // Gol contra com 3 times ou mais: falta escolher para qual time vai (ou sai) o gol.
   const [pick, setPick] = useState<{ memberId: string; delta: 1 | -1 } | null>(null);
 

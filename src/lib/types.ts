@@ -74,6 +74,8 @@ export type Attendance = {
   member_id: string;
   going: boolean;
   confirmed_at: string;
+  /** Time escolhido para um convidado neste jogo, antes do sorteio. */
+  team?: string | null;
 };
 
 export type Payment = {

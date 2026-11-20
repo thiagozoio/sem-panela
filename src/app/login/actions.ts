@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/auth";
 import { siteUrl } from "@/lib/site";
 
-export type LoginState = { step: "email" | "code"; email?: string; error?: string; next: string };
+export type LoginState = { step: "email" | "code" | "password"; email?: string; error?: string; next: string };
 
 export async function sendCode(prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -31,6 +31,27 @@ export async function verifyCode(prev: LoginState, formData: FormData): Promise<
   const { error } = await supabase.auth.verifyOtp({ email: prev.email, token, type: "email" });
   if (error) return { ...prev, error: "Código inválido ou expirado." };
   redirect(safeNext(prev.next));
+}
+
+/** Entrar com e-mail e senha (para quem já criou a senha no Perfil). */
+export async function signInWithPassword(prev: LoginState, formData: FormData): Promise<LoginState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const next = safeNext(prev.next);
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { ...prev, email, error: "Digite um e-mail válido." };
+  if (!password) return { ...prev, email, error: "Digite sua senha." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (error.status === 429) return { ...prev, email, error: "Muitas tentativas. Espere um minuto e tente de novo." };
+    return {
+      ...prev,
+      email,
+      error: "E-mail ou senha errados. Se ainda não criou uma senha, ou esqueceu, entre pelo código e crie uma nova no Perfil.",
+    };
+  }
+  redirect(next);
 }
 
 /** Entrar com Google (só aparece com NEXT_PUBLIC_GOOGLE_LOGIN=1). Volta pelo /auth/confirm. */

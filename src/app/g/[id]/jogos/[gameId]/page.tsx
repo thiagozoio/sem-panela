@@ -7,12 +7,16 @@ import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
-import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
-import { sportOf } from "@/lib/sports";
+import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/fixed-teams";
+import { positionInfo, positionRank, sportOf } from "@/lib/sports";
+import { outcomes } from "@/lib/standings";
+import { teamColors } from "@/lib/team-colors";
 import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
+import { liveOpenForPlayers } from "@/lib/live";
 import { LiveGoals } from "./live-goals";
+import { Scoreboard, TeamRosters, type BoardTeam } from "./scoreboard";
 
 export const metadata: Metadata = { title: "Resultado" };
 
@@ -78,14 +82,49 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
     : best
       ? { name: nameOf(best.member_id), detail: `nota ${Number(best.average).toFixed(1).replace(".", ",")}` }
       : null;
+  const craqueIds = new Set(winners.length ? winners.map((w) => w.member_id) : best ? [best.member_id] : []);
+
+  // Placar visual e elenco em fichas: cada time com a cor do nome (ou da paleta) e o resultado.
+  const sport = sportOf(group.sport);
+  const results = game.teams && game.scores?.length === game.teams.length ? outcomes(game.scores) : null;
+  const colors = teamColors(game.teams?.map((t) => t.name) ?? []);
+  const boardTeams: BoardTeam[] =
+    game.teams?.map((t, i) => ({
+      name: t.name,
+      color: colors[i],
+      score: game.scores?.[i] ?? null,
+      result: results?.[i].result ?? null,
+      players: t.players
+        .filter((p) => playedIds.has(p.member_id))
+        .sort((a, b) => positionRank(sport, a.position) - positionRank(sport, b.position) || nameOf(a.member_id).localeCompare(nameOf(b.member_id), "pt-BR"))
+        .map((p) => ({
+          id: p.member_id,
+          name: nameOf(p.member_id),
+          short: positionInfo(sport, p.position)?.short ?? "",
+          goals: goalsOf.get(p.member_id) ?? 0,
+          ownGoals: ownGoalsOf.get(p.member_id) ?? 0,
+          guest: !!byId.get(p.member_id)?.guest,
+          craque: craqueIds.has(p.member_id),
+        })),
+    })) ?? [];
+  const rosterTeams = boardTeams.filter((t) => t.players.length > 0);
+  // Gols de quem está nas fichas já aparecem nelas; a lista mostra só o resto.
+  const inChips = new Set(rosterTeams.flatMap((t) => t.players.map((p) => p.id)));
+  const showRosters = started && rosterTeams.length > 0;
+  const looseGoals = showRosters ? (goals ?? []).filter((g) => !inChips.has(g.member_id)) : (goals ?? []);
+  const goalLines = scorers(looseGoals, nameOf);
+  const ownGoalLines = ownGoalScorers(looseGoals, nameOf);
   const myRating = new Map((myRatings ?? []).map((r) => [r.rated_id, r.rating]));
   const hasResult = !!game.scores?.length || goalList.length > 0 || ownGoalList.length > 0;
   const canEditResult = isOrganizer && !readOnly;
+  // Durante o jogo, todo mundo do grupo marca gols ao vivo; depois, só o organizador corrige.
+  const playersLive = !!me && !readOnly && liveOpenForPlayers(game.starts_at);
+  const canMarkLive = canEditResult || playersLive;
 
   // Jogo sem times salvos (não teve sorteio): se o mês tem times fixos, o placar
   // é anotado com eles, e ao salvar eles viram os times do jogo.
   let fixedTeams: Game["teams"] = null;
-  if (canEditResult && started && !game.teams) {
+  if (canMarkLive && started && !game.teams) {
     const { data: fixed } = await supabase
       .from("fixed_teams")
       .select("name, member_ids")
@@ -94,8 +133,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
       .order("sort")
       .returns<Pick<FixedTeam, "name" | "member_ids">[]>();
     if (fixed?.length) {
-      const sport = sportOf(group.sport);
-      const teams = teamsFromFixed(fixed, played.map((m) => toDrawPlayer(sport, m)));
+      const withGuests = withGuestTeams(fixed, guestTeams(attendances ?? [], members));
+      const teams = teamsFromFixed(withGuests, played.map((m) => toDrawPlayer(sport, m)));
       if (teams.length >= 2) fixedTeams = teams;
     }
   }
@@ -128,15 +167,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
         </div>
 
-        {game.teams && game.scores?.length ? (
-          <div className="flex flex-wrap justify-center gap-3 text-center">
-            {game.teams.map((t, i) => (
-              <div key={t.name} className="min-w-24 rounded-xl bg-pitch-50 px-3 py-2">
-                <p className="text-sm font-semibold text-pitch-900">{t.name}</p>
-                <p className="text-3xl font-extrabold">{game.scores?.[i] ?? 0}</p>
-              </div>
-            ))}
-          </div>
+        {results ? (
+          <Scoreboard teams={boardTeams} />
         ) : (
           !hasResult && (
             <p className="text-sm text-neutral-500">
@@ -145,17 +177,39 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           )
         )}
 
-        {(goalList.length > 0 || ownGoalList.length > 0) && (
+        {started && played.length > 0 && (
+          <div className={showRosters ? "border-t border-neutral-100 pt-3" : ""}>
+            {showRosters ? (
+              <TeamRosters teams={rosterTeams} />
+            ) : (
+              <>
+                <h3 className="text-sm font-semibold">Quem jogou</h3>
+                <p className="text-sm text-neutral-700">{played.map((m) => m.name).join(", ")}</p>
+              </>
+            )}
+            {canEditResult && (
+              <p className="mt-2 text-xs text-neutral-500">
+                Alguém aí não jogou? Marque &quot;Não jogou&quot; em{" "}
+                <a href="#quem-jogou" className="text-pitch-700 underline">
+                  Corrigir quem jogou
+                </a>
+                .
+              </p>
+            )}
+          </div>
+        )}
+
+        {(goalLines.length > 0 || ownGoalLines.length > 0) && (
           <div>
             <h3 className="text-sm font-semibold">Gols</h3>
             <ul className="text-sm">
-              {goalList.map((g) => (
+              {goalLines.map((g) => (
                 <li key={g.name}>
                   ⚽ {g.name}
                   {g.goals > 1 && <span className="text-neutral-500"> ({g.goals})</span>}
                 </li>
               ))}
-              {ownGoalList.map((g) => (
+              {ownGoalLines.map((g) => (
                 <li key={`contra-${g.name}`}>
                   ⚽ {g.name} <span className="text-neutral-500">{ownGoalLabel(g.goals)}</span>
                 </li>
@@ -178,12 +232,20 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         )}
       </Card>
 
-      {canEditResult && started && (
+      {canMarkLive && started && (
         <Card>
           <details open={live} id="ao-vivo">
             <summary className="cursor-pointer font-semibold">⚽ Marcar gols ao vivo</summary>
-            <div className="mt-3">
+            <div className="mt-3 space-y-3">
+              <p className="text-xs text-neutral-500">
+                {canEditResult
+                  ? playersLive
+                    ? "Durante o jogo qualquer jogador do grupo também pode marcar. Depois, só os organizadores corrigem."
+                    : "Os jogadores já não marcam mais. Só os organizadores corrigem."
+                  : "Qualquer um do grupo pode marcar durante o jogo. Combinem quem marca para não contar o mesmo gol duas vezes. Depois do jogo, só o organizador corrige."}
+              </p>
               <LiveGoals
+                poll={playersLive}
                 groupId={group.id}
                 gameId={game.id}
                 teams={liveTeams}
@@ -197,7 +259,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
 
       {canEditResult && started && (
         <Card>
-          <details>
+          <details id="quem-jogou">
             <summary className="cursor-pointer font-semibold">Corrigir quem jogou</summary>
             <form action={saveLineup} className="mt-3 space-y-3">
               <input type="hidden" name="game_id" value={game.id} />
@@ -207,10 +269,15 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
                 {game.teams ? " e nos times" : " e na cobrança de avulso"}. Ninguém recebe aviso.
               </p>
               <ul className="divide-y divide-neutral-100">
-                {lineup.map((m) => {
+                {lineup.map((m, i) => {
                   const playing = playedIds.has(m.id);
                   return (
-                    <li key={m.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                    <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                      {!playing && i === played.length && (
+                        <p className="w-full pt-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                          Não jogaram (resto do grupo, para incluir quem veio)
+                        </p>
+                      )}
                       <span className={playing ? "" : "text-neutral-500"}>
                         {m.name}
                         {m.guest && <span className="text-xs text-neutral-400"> (convidado)</span>}

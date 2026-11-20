@@ -2,7 +2,7 @@ import "server-only";
 import { getGroupContext } from "@/lib/groups";
 import { todayInBrazil } from "@/lib/format";
 import { sportOf } from "@/lib/sports";
-import { rankingOf, type Championship, type ResultGame } from "@/lib/standings";
+import { rankingOf, withoutGuests, type Championship, type ResultGame } from "@/lib/standings";
 
 /** Tudo o que a classificação precisa: jogos com placar, nomes dos times fixos e campeonatos. */
 export async function loadRanking(groupId: string) {
@@ -12,7 +12,7 @@ export async function loadRanking(groupId: string) {
   const [{ data: games }, { data: fixed }, { data: championships }] = await Promise.all([
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores, game_goals(member_id, goals)")
+      .select("id, starts_at, teams, scores, game_goals(member_id, goals), attendances(member_id, going)")
       .eq("group_id", group.id)
       .not("scores", "is", null)
       .lte("starts_at", new Date().toISOString())
@@ -33,7 +33,8 @@ export async function loadRanking(groupId: string) {
     mode,
     sport: sportOf(group.sport),
     today: todayInBrazil(),
-    games: games ?? [],
+    // Convidado nunca entra na classificação.
+    games: withoutGuests(games ?? [], new Set(members.filter((m) => m.guest).map((m) => m.id))),
     championships: championships ?? [],
     fixedNames: (month: string) => fixedByMonth.get(month) ?? new Set<string>(),
     nameOf: (memberId: string, fallback = "?") => byId.get(memberId) ?? fallback,

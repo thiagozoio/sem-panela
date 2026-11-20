@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { splitList } from "@/lib/attendance";
 import { drawTeams } from "@/lib/draw";
 import { apartPairs } from "@/lib/apart";
-import { teamsFromFixed, toDrawPlayer } from "@/lib/fixed-teams";
+import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/fixed-teams";
 import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf } from "@/lib/sports";
@@ -22,12 +22,14 @@ import {
   standings,
   tableGames,
   turnsOf,
+  withoutGuests,
   type Championship,
   type ResultGame,
 } from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
-import { applyLiveGoal, type LiveState, type LiveTarget } from "@/lib/live";
+import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } from "@/lib/live";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -127,52 +129,43 @@ export async function addGuest(_prev: GuestState, fd: FormData): Promise<GuestSt
   }
   await saveSkill(supabase, groupId, memberId, clampInt(str(fd, "skill"), 1, 5, 3));
 
+  const team = str(fd, "team");
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
+  const drawn = !!game?.teams?.length;
+  // Ainda sem sorteio: o time escolhido fica guardado só na presença deste jogo
+  // (não nos times fixos do mês), e vale quando o organizador usar os times fixos.
+  const gameTeam = !drawn && team ? team.slice(0, 30) : null;
+
   const { data: current } = await supabase
     .from("attendances")
     .select("going")
     .eq("game_id", gameId)
     .eq("member_id", memberId)
     .maybeSingle<{ going: boolean }>();
-  if (!current) await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true });
-  else if (!current.going) {
-    await supabase
-      .from("attendances")
-      .update({ going: true, confirmed_at: new Date().toISOString() })
-      .eq("game_id", gameId)
-      .eq("member_id", memberId);
+  const { error: attendanceError } = !current
+    ? await supabase.from("attendances").insert({ game_id: gameId, member_id: memberId, going: true, team: gameTeam })
+    : await supabase
+        .from("attendances")
+        .update(current.going ? { team: gameTeam } : { going: true, team: gameTeam, confirmed_at: new Date().toISOString() })
+        .eq("game_id", gameId)
+        .eq("member_id", memberId);
+  if (attendanceError) {
+    return {
+      error: attendanceError.message.includes("team")
+        ? "Falta rodar a atualização do banco (time do convidado) no Supabase."
+        : "Não deu para pôr o convidado. Tente de novo.",
+    };
   }
 
-  const team = str(fd, "team");
-  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
-  let joined = "";
-  if (game?.teams?.length) {
+  let joined = gameTeam ?? "";
+  if (drawn && game?.teams) {
     // Times do jogo já montados: entra direto no time escolhido.
     const player = { member_id: memberId, name, position: positionOf(sportOf(group.sport), position) };
     await supabase.from("games").update({ teams: addToTeam(game.teams, player, team) }).eq("id", gameId);
     joined = team;
-  } else if (team && game) {
-    // Ainda sem sorteio: entra no time fixo do mês, para já cair nele em "Usar times fixos".
-    joined = (await putInFixedTeam(supabase, groupId, monthOf(game.starts_at), memberId, team)) ? team : "";
   }
   refresh();
   return { added: joined ? `${name} entrou no ${joined}` : `${name} entrou na lista` };
-}
-
-/** Põe o convidado num time fixo do mês (e tira dos outros). Devolve false se o time não existe. */
-async function putInFixedTeam(supabase: Client, groupId: string, month: string, memberId: string, team: string) {
-  const { data: fixed } = await supabase
-    .from("fixed_teams")
-    .select("id, name, member_ids")
-    .eq("group_id", groupId)
-    .eq("month", month)
-    .returns<Pick<FixedTeam, "id" | "name" | "member_ids">[]>();
-  const target = (fixed ?? []).find((t) => t.name === team);
-  if (!target) return false;
-  for (const t of fixed ?? []) {
-    const ids = t.id === target.id ? [...new Set([...t.member_ids, memberId])] : t.member_ids.filter((id) => id !== memberId);
-    if (ids.length !== t.member_ids.length) await supabase.from("fixed_teams").update({ member_ids: ids }).eq("id", t.id);
-  }
-  return true;
 }
 
 /** Tira o convidado da lista e do time deste jogo. */
@@ -180,12 +173,10 @@ export async function removeGuest(fd: FormData) {
   const gameId = str(fd, "game_id");
   const memberId = str(fd, "member_id");
   const supabase = await createClient();
-  const { data: game } = await supabase.from("games").select("teams, starts_at").eq("id", gameId).single<Pick<Game, "teams" | "starts_at">>();
+  const { data: game } = await supabase.from("games").select("teams").eq("id", gameId).single<Pick<Game, "teams">>();
   if (game?.teams?.length) {
     await supabase.from("games").update({ teams: removeFromTeams(game.teams, memberId) }).eq("id", gameId);
   }
-  // Também sai dos times fixos do mês, onde só convidados entram por aqui.
-  if (game) await putInFixedTeam(supabase, str(fd, "group_id"), monthOf(game.starts_at), memberId, "");
   await clearAttendance(fd);
 }
 
@@ -246,9 +237,14 @@ export async function removeApartRule(fd: FormData) {
 async function confirmedForGame(groupId: string, gameId: string) {
   const ctx = await getGroupContext(groupId);
   if (!ctx.isOrganizer) return null;
+  return gameData(ctx, gameId);
+}
+
+/** O jogo, os confirmados e o resto que o sorteio e o placar precisam (lido como o usuário, pela RLS). */
+async function gameData(ctx: Awaited<ReturnType<typeof getGroupContext>>, gameId: string) {
   const { supabase, group, members } = ctx;
   const [{ data: game }, { data: attendances }] = await Promise.all([
-    supabase.from("games").select("*").eq("id", gameId).single<Game>(),
+    supabase.from("games").select("*").eq("id", gameId).eq("group_id", group.id).single<Game>(),
     supabase.from("attendances").select("*").eq("game_id", gameId).returns<Attendance[]>(),
   ]);
   if (!game) return null;
@@ -258,9 +254,10 @@ async function confirmedForGame(groupId: string, gameId: string) {
     supabase,
     game,
     userId: ctx.user.id,
-    apart: await apartPairs(supabase, groupId),
+    apart: await apartPairs(supabase, group.id),
     players: confirmed.map(({ member }) => toDrawPlayer(sport, member)),
     guestIds: new Set(confirmed.filter((e) => e.member.guest).map((e) => e.member.id)),
+    guestTeams: guestTeams(attendances ?? [], members),
   };
 }
 
@@ -275,7 +272,7 @@ export async function drawTeamsAction(fd: FormData) {
 }
 
 /** Times do jogo montados com os times fixos do mês (null se o mês não tem times fixos). */
-async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<ReturnType<typeof confirmedForGame>>>) {
+async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<ReturnType<typeof gameData>>>) {
   const { data: fixed } = await data.supabase
     .from("fixed_teams")
     .select("*")
@@ -284,14 +281,10 @@ async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<Retu
     .order("sort")
     .returns<FixedTeam[]>();
   if (!fixed?.length) return null;
-  // Convidado que já foi posto num time continua nele.
-  const guestTeam = new Map<string, string>();
+  // Convidado vai no time escolhido para ele neste jogo; se já estava num time do jogo, continua nele.
+  const guestTeam = new Map(data.guestTeams);
   for (const t of data.game.teams ?? []) for (const p of t.players) if (data.guestIds.has(p.member_id)) guestTeam.set(p.member_id, t.name);
-  const withGuests = fixed.map((t) => ({
-    ...t,
-    member_ids: [...t.member_ids, ...[...guestTeam].filter(([, name]) => name === t.name).map(([id]) => id)],
-  }));
-  return teamsFromFixed(withGuests, data.players, data.apart);
+  return teamsFromFixed(withGuestTeams(fixed, guestTeam), data.players, data.apart);
 }
 
 /** Monta os times do jogo com os times fixos do mês. */
@@ -362,7 +355,9 @@ export async function saveResult(fd: FormData) {
 }
 
 /**
- * Placar ao vivo: um gol a mais ou a menos, salvo na hora. Com memberId mexe nos gols
+ * Placar ao vivo: um gol a mais ou a menos, salvo na hora. O organizador marca e corrige
+ * quando quiser; qualquer jogador do grupo marca só durante o jogo (liveOpenForPlayers).
+ * Com memberId mexe nos gols
  * do jogador e no placar do time dele; com ownGoal + team é gol contra do jogador, que
  * vai para o time `team`; só com team é gol sem autor, só no placar.
  * Jogo sem times salvos mas com times fixos no mês: os times fixos viram os times do jogo.
@@ -378,10 +373,22 @@ export async function liveGoal(input: {
 }): Promise<LiveState | null> {
   const { groupId, gameId } = input;
   const delta = input.delta === -1 ? -1 : 1;
-  const data = await confirmedForGame(groupId, gameId);
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.me || ctx.readOnly) return null;
+  const data = await gameData(ctx, gameId);
   if (!data || data.game.group_id !== groupId) return null;
-  const { supabase, game } = data;
+  const { game } = data;
   if (new Date(game.starts_at).getTime() > Date.now()) return null;
+  // A RLS só deixa o organizador gravar gols e placar. Para o jogador, durante o jogo, o
+  // servidor confere tudo aqui (é do grupo, grupo em dia, jogo do grupo rolando) e grava
+  // com a chave secreta, só neste jogo e só nos gols e no placar.
+  let supabase: Pick<typeof ctx.supabase, "from"> = ctx.supabase;
+  if (!ctx.isOrganizer) {
+    if (!liveOpenForPlayers(game.starts_at)) return null;
+    const admin = createAdminClient();
+    if (!admin) return null;
+    supabase = admin;
+  }
 
   let teams = game.teams;
   let teamsUpdate = {};
@@ -443,7 +450,8 @@ export async function liveGoal(input: {
     const { error } = await supabase
       .from("games")
       .update({ scores: next.scores, ...teamsUpdate })
-      .eq("id", gameId);
+      .eq("id", gameId)
+      .eq("group_id", groupId);
     if (error) return null;
   }
   return next;
@@ -693,9 +701,18 @@ export async function copyFixedTeams(fd: FormData) {
     .order("sort")
     .returns<FixedTeam[]>();
   if (!previous?.length) return;
-  await supabase
-    .from("fixed_teams")
-    .insert(previous.map(({ name, sort, member_ids }) => ({ group_id: groupId, month, name, sort, member_ids })));
+  // Convidados não passam para o mês seguinte: eles só estavam no time pelo jogo em que vieram.
+  const { data: guests } = await supabase.from("members").select("id").eq("group_id", groupId).eq("guest", true);
+  const guestIds = new Set((guests ?? []).map((g) => g.id as string));
+  await supabase.from("fixed_teams").insert(
+    previous.map(({ name, sort, member_ids }) => ({
+      group_id: groupId,
+      month,
+      name,
+      sort,
+      member_ids: member_ids.filter((id) => !guestIds.has(id)),
+    })),
+  );
   refresh();
 }
 
@@ -821,7 +838,7 @@ export async function buildFinalTeams(fd: FormData) {
     supabase.from("championships").select("*").eq("group_id", groupId).returns<Championship[]>(),
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores")
+      .select("id, starts_at, teams, scores, attendances(member_id, going)")
       .eq("group_id", groupId)
       .not("scores", "is", null)
       .returns<ResultGame[]>(),
@@ -833,7 +850,8 @@ export async function buildFinalTeams(fd: FormData) {
   const byId = new Map(members.map((m) => [m.id, m]));
   const nameOf = (id: string, fallback: string) => byId.get(id)?.name ?? fallback;
   const finals = finalGameIds(list ?? []);
-  const [first, second] = turns.map((t) => standings(tableGames(games ?? [], t, finals), nameOf).players);
+  const noGuests = withoutGuests(games ?? [], new Set(members.filter((m) => m.guest).map((m) => m.id)));
+  const [first, second] = turns.map((t) => standings(tableGames(noGuests, t, finals), nameOf).players);
   const ids = finalTeamIds(first, second, group.players_per_team);
   const sport = sportOf(group.sport);
   const teams = turns.map((t, i) => ({

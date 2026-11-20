@@ -108,7 +108,7 @@ export default async function FixedTeamsPage({ params, searchParams }: PageProps
         <>
           <div className="grid gap-3 sm:grid-cols-2">
             {teams.map((t) => {
-              const players = t.member_ids.map((mid) => byId.get(mid)).filter((m): m is Member => !!m && m.active);
+              const players = t.member_ids.map((mid) => byId.get(mid)).filter((m): m is Member => !!m && m.active && !m.guest);
               return (
                 <Card key={t.id} className="space-y-2">
                   {canEdit ? (

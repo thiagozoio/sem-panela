@@ -40,7 +40,4 @@ export async function requireUser(next = "/grupos"): Promise<CurrentUser> {
   return user;
 }
 
-/** Só aceita caminhos internos para evitar redirecionamento aberto. */
-export function safeNext(next: unknown, fallback = "/grupos"): string {
-  return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
-}
+export { safeNext } from "./safe-next";
