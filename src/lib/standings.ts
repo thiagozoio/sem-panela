@@ -85,6 +85,19 @@ export function playedTeams(g: Pick<ResultGame, "teams" | "attendances">): Game[
   return g.teams.map((t) => ({ ...t, players: t.players.filter((p) => !out.has(p.member_id)) }));
 }
 
+/**
+ * Jogos sem os convidados: convidado não entra na tabela, na artilharia nem entre os campeões.
+ * O placar do jogo continua o mesmo (os gols dele valeram para o time).
+ */
+export function withoutGuests<G extends ResultGame>(games: G[], guestIds: ReadonlySet<string>): G[] {
+  if (!guestIds.size) return games;
+  return games.map((g) => ({
+    ...g,
+    teams: g.teams?.map((t) => ({ ...t, players: t.players.filter((p) => !guestIds.has(p.member_id)) })) ?? g.teams,
+    game_goals: g.game_goals?.filter((s) => !guestIds.has(s.member_id)),
+  }));
+}
+
 /** Só conta jogo com 2 times ou mais e placar de todos eles. */
 export function hasResult(g: ResultGame): g is ResultGame & { teams: NonNullable<Game["teams"]>; scores: number[] } {
   return !!g.teams && g.teams.length >= 2 && !!g.scores && g.scores.length === g.teams.length;
