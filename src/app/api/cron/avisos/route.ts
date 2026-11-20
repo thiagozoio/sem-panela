@@ -29,11 +29,18 @@ export async function GET(request: Request) {
   const today = todayInBrazil();
   const { data: groups } = await admin.from("groups").select("*").returns<Group[]>();
   const counts = { jogos: 0, mensalidades: 0, assinaturas: 0 };
+  // Cartão no Asaas cobra sozinho no vencimento: sem lembrete antes (só se atrasar).
+  const { data: cards } = await admin
+    .from("billing_accounts")
+    .select("group_id")
+    .eq("status", "active")
+    .eq("billing_type", "CREDIT_CARD");
+  const autoCharged = new Set((cards ?? []).map((c) => c.group_id as string));
 
   for (const group of groups ?? []) {
     try {
       const state = subscriptionState(group.paid_until, today);
-      if (SUBSCRIPTION_REMINDER_DAYS.includes(state.daysLeft)) {
+      if (SUBSCRIPTION_REMINDER_DAYS.includes(state.daysLeft) && !(autoCharged.has(group.id) && state.daysLeft >= 0)) {
         counts.assinaturas += await subscriptionReminder(admin, group, state.daysLeft);
       }
       if (state.status === "read_only") continue;
