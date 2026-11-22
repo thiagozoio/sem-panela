@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
+import { Card, LinkButton } from "@/components/ui";
 import { CopyField, ShareButtons } from "@/components/share";
 import { getGroupContext } from "@/lib/groups";
 import { siteUrl } from "@/lib/site";
@@ -35,6 +35,16 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
 
       <Card>
         <SettingsForm group={group} disabled={readOnly} />
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-semibold">Histórico de alterações</h2>
+        <p className="text-sm text-neutral-600">
+          Veja o que foi mudado (pagamentos, placar, times, jogadores…), por quem e quando, e desfaça se precisar.
+        </p>
+        <LinkButton variant="secondary" href={`/g/${group.id}/historico`}>
+          Ver histórico
+        </LinkButton>
       </Card>
 
       <div id="assinatura" className="scroll-mt-4">
