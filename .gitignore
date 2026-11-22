@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backups do banco (nunca commitar: têm dados pessoais)
+backup/
+*.dump
+*.dump.gpg

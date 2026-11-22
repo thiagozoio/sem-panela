@@ -1,0 +1,58 @@
+name: Backup diário do banco
+
+# Todo dia às 03:00 de Brasília (06:00 UTC) e também pelo botão "Run workflow".
+# O backup sai criptografado (AES-256) e fica 90 dias em "Artifacts" desta
+# execução. O repositório é público: nunca envie o arquivo sem criptografia.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-banco
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir segredos
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::Falta o segredo SUPABASE_DB_URL"; exit 1; }
+          [ -n "$BACKUP_PASSPHRASE" ] || { echo "::error::Falta o segredo BACKUP_PASSPHRASE"; exit 1; }
+          [ "${#BACKUP_PASSPHRASE}" -ge 12 ] || { echo "::error::BACKUP_PASSPHRASE precisa de 12 caracteres ou mais"; exit 1; }
+
+      # O pg_dump precisa ser da mesma versão (ou mais nova) do Postgres do
+      # Supabase. Pergunta a versão ao servidor e instala o cliente certo.
+      - name: Instalar o pg_dump da versão do Supabase
+        run: |
+          command -v psql >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq postgresql-client; }
+          MAJOR="$(psql "$SUPABASE_DB_URL" -Atc 'show server_version_num' | cut -c1-2)"
+          echo "Postgres do Supabase: $MAJOR"
+          if [ ! -x "/usr/lib/postgresql/$MAJOR/bin/pg_dump" ]; then
+            sudo apt-get install -yq postgresql-common
+            sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+            sudo apt-get install -yq "postgresql-client-$MAJOR"
+          fi
+          echo "PG_BIN=/usr/lib/postgresql/$MAJOR/bin" >> "$GITHUB_ENV"
+
+      - name: Fazer o backup criptografado
+        run: scripts/backup-banco.sh backup
+
+      - name: Guardar o backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-banco-${{ github.run_number }}
+          path: backup/*.gpg
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
