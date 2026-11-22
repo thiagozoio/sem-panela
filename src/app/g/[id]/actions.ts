@@ -30,6 +30,7 @@ import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } from "@/lib/live";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { undoErrorMessage } from "@/lib/history";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
@@ -1056,6 +1057,21 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
     const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
     if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
   }
+  refresh();
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Histórico de alterações
+// ---------------------------------------------------------------------------
+
+export type UndoState = { error?: string; ok?: boolean };
+
+/** Desfaz uma das 5 alterações mais recentes (o banco confere organizador, limite e conflitos). */
+export async function undoChange(_prev: UndoState, fd: FormData): Promise<UndoState> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_change", { p_change_id: str(fd, "change_id") });
+  if (error) return { error: undoErrorMessage(error.message) };
   refresh();
   return { ok: true };
 }
