@@ -21,6 +21,24 @@ export type SubscribeState = { error?: string };
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
 
+/**
+ * Reaproveita o cliente salvo no Asaas ou cria um novo. O salvo pode não existir mais
+ * (foi criado no Sandbox e a chave agora é de produção, ou foi apagado no painel): aí cria outro.
+ */
+async function ensureCustomer(
+  savedId: string | undefined,
+  input: { name: string; cpfCnpj: string; email: string; externalReference: string },
+): Promise<string> {
+  if (savedId) {
+    try {
+      return (await updateCustomer(savedId, { name: input.name, cpfCnpj: input.cpfCnpj, email: input.email })).id;
+    } catch (e) {
+      if (!(e instanceof AsaasError && e.status === 404)) throw e;
+    }
+  }
+  return (await createCustomer(input)).id;
+}
+
 /** "Assinar": cria o cliente e a assinatura no Asaas e leva o organizador à página de pagamento. */
 export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<SubscribeState> {
   const groupId = str(fd, "group_id");
@@ -43,13 +61,24 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
       .eq("group_id", group.id)
       .maybeSingle<BillingAccount>();
 
-    // Já tem assinatura ativa: só abre a cobrança em aberto.
+    // Já tem assinatura ativa: só abre a cobrança em aberto. Se ela não existe mais no Asaas
+    // (era do Sandbox, ou foi apagada no painel), cria uma nova.
+    let reused = false;
     if (existing?.status === "active" && existing.asaas_subscription_id) {
-      invoiceUrl = openPayment(await subscriptionPayments(existing.asaas_subscription_id), todayInBrazil())?.invoiceUrl ?? null;
-    } else {
-      const customer = existing?.asaas_customer_id
-        ? (await updateCustomer(existing.asaas_customer_id, { name, cpfCnpj: doc, email: user.email })).id
-        : (await createCustomer({ name, cpfCnpj: doc, email: user.email, externalReference: group.id })).id;
+      try {
+        invoiceUrl = openPayment(await subscriptionPayments(existing.asaas_subscription_id), todayInBrazil())?.invoiceUrl ?? null;
+        reused = true;
+      } catch (e) {
+        if (!(e instanceof AsaasError && e.status === 404)) throw e;
+      }
+    }
+    if (!reused) {
+      const customer = await ensureCustomer(existing?.asaas_customer_id, {
+        name,
+        cpfCnpj: doc,
+        email: user.email,
+        externalReference: group.id,
+      });
 
       const sub = await createSubscription({
         customer,
