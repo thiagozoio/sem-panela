@@ -5,7 +5,8 @@ import { Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { WEEKDAYS } from "@/lib/format";
+import { WEEKDAYS, formatMoney } from "@/lib/format";
+import { PRICE_CENTS } from "@/lib/subscription";
 import { SPORTS, sportOf } from "@/lib/sports";
 
 export const metadata: Metadata = { title: "Nova pelada" };
@@ -32,7 +33,7 @@ export default async function NewGroupPage({ searchParams }: PageProps<"/grupos/
   const { erro } = await searchParams;
   return (
     <AppShell admin={user.isAdmin}>
-      <PageHeader title="Nova pelada" subtitle="30 dias grátis. Depois, R$ 19,90 por mês, jogadores ilimitados." />
+      <PageHeader title="Nova pelada" subtitle={`30 dias grátis. Depois, ${formatMoney(PRICE_CENTS)} por mês, jogadores ilimitados.`} />
       <Card>
         <form action={createGroup} className="space-y-4">
           {erro && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">Não deu para criar. Confira os dados e tente de novo.</p>}

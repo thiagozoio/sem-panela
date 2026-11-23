@@ -1,6 +1,10 @@
 import { daysBetween } from "./format";
 
-export const PRICE_CENTS = 1990;
+/** Preço normal por grupo, por mês. */
+export const PRICE_CENTS = 2990;
+/** Preço de fundador, para sempre, dos primeiros grupos que assinam (limite no banco). */
+export const FOUNDER_PRICE_CENTS = 1990;
+export const FOUNDER_SPOTS = 10;
 export const GRACE_DAYS = 7;
 
 export type SubscriptionState =

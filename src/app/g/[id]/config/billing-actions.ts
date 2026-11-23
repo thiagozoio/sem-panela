@@ -14,7 +14,7 @@ import {
 import { firstDueDate, isValidCpfCnpj, onlyDigits, openPayment, type BillingAccount, type BillingType } from "@/lib/billing";
 import { todayInBrazil } from "@/lib/format";
 import { getGroupContext } from "@/lib/groups";
-import { PRICE_CENTS } from "@/lib/subscription";
+import { FOUNDER_PRICE_CENTS, PRICE_CENTS } from "@/lib/subscription";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type SubscribeState = { error?: string };
@@ -54,6 +54,7 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
   if (!asaasEnabled() || !admin) return { error: "Pagamento automático ainda não está ligado. Use o Pix abaixo." };
 
   let invoiceUrl: string | null = null;
+  let claimedNow = false;
   try {
     const { data: existing } = await admin
       .from("billing_accounts")
@@ -73,6 +74,13 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
       }
     }
     if (!reused) {
+      // Vaga de fundador: o banco decide com trava, então nunca passa de 10 grupos.
+      const { data: wasFounder } = await admin.from("billing_founders").select("group_id").eq("group_id", group.id).maybeSingle();
+      const { data: founder, error: founderError } = await admin.rpc("billing_claim_founder", { p_group_id: group.id });
+      if (founderError) throw new Error(founderError.message);
+      claimedNow = founder === true && !wasFounder;
+      const priceCents = founder === true ? FOUNDER_PRICE_CENTS : PRICE_CENTS;
+
       const customer = await ensureCustomer(existing?.asaas_customer_id, {
         name,
         cpfCnpj: doc,
@@ -83,7 +91,7 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
       const sub = await createSubscription({
         customer,
         billingType,
-        value: PRICE_CENTS / 100,
+        value: priceCents / 100,
         nextDueDate: firstDueDate(group.paid_until, todayInBrazil()),
         cycle: "MONTHLY",
         description: `Sem Panela · ${group.name}`,
@@ -99,6 +107,7 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
         status: "active",
         payer_name: name,
         payer_doc: doc,
+        price_cents: priceCents,
         created_by: user.id,
         updated_at: new Date().toISOString(),
       });
@@ -111,6 +120,8 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
     }
   } catch (e) {
     console.error("assinar", group.id, e);
+    // Não assinou: devolve a vaga de fundador que acabou de pegar.
+    if (claimedNow) await admin.rpc("billing_release_founder", { p_group_id: group.id });
     return { error: e instanceof AsaasError ? `O Asaas recusou: ${e.message}` : "Não deu para criar a assinatura. Tente de novo." };
   }
 
@@ -141,5 +152,7 @@ export async function cancelBilling(fd: FormData) {
     .from("billing_accounts")
     .update({ status: "canceled", updated_at: new Date().toISOString() })
     .eq("group_id", group.id);
+  // Cancelou sem nunca ter pago: a vaga de fundador volta para outro grupo.
+  await admin.rpc("billing_release_founder", { p_group_id: group.id });
   refresh();
 }

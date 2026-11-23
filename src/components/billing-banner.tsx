@@ -5,11 +5,11 @@ import { GRACE_DAYS, PRICE_CENTS, type SubscriptionState } from "@/lib/subscript
 export const BILLING_PIX_KEY = process.env.NEXT_PUBLIC_BILLING_PIX_KEY ?? "";
 export const BILLING_WHATSAPP = process.env.NEXT_PUBLIC_BILLING_WHATSAPP ?? "";
 
-export function PayInstructions({ groupName }: { groupName: string }) {
+export function PayInstructions({ groupName, priceCents = PRICE_CENTS }: { groupName: string; priceCents?: number }) {
   const text = `Oi! Segue o comprovante da mensalidade do Sem Panela do grupo "${groupName}".`;
   return (
     <span>
-      Faça um Pix de <strong>{formatMoney(PRICE_CENTS)}</strong>
+      Faça um Pix de <strong>{formatMoney(priceCents)}</strong>
       {BILLING_PIX_KEY && (
         <>
           {" "}para a chave <strong className="break-all">{BILLING_PIX_KEY}</strong>

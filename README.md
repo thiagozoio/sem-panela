@@ -23,7 +23,7 @@ App web (PWA) em **Next.js 16 + Supabase**, hospedado na **Vercel**.
 - **Lista de espera**: quem confirma depois de lotar espera; quando alguém desiste, o primeiro da espera sobe sozinho.
 - **Prioridade**: mensalista que confirma até `priority_hours` (padrão 24h) antes do jogo passa na frente dos avulsos.
 - **Sorteio** (`src/lib/draw.ts`): um goleiro por time, linha distribuída por nível e depois trocas que reduzem a diferença entre os times.
-- **Assinatura**: R$ 19,90/mês por grupo, Pix manual para o dono. O banco guarda `groups.paid_until`; 7 dias depois do vencimento o grupo fica **só leitura** (garantido pela RLS).
+- **Assinatura**: R$ 29,90/mês por grupo (os 10 primeiros grupos que assinam pelo app pagam R$ 19,90 para sempre: tabela `billing_founders`). Pix manual para o dono quando o Asaas está desligado. O banco guarda `groups.paid_until`; 7 dias depois do vencimento o grupo fica **só leitura** (garantido pela RLS).
 
 ### Avisos no celular (Web Push)
 Funciona no Android (Chrome) e no iPhone com o app instalado na tela de início (iOS 16.4+). O jogador ativa na tela da pelada ou no Perfil.
