@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { themeScript } from "@/lib/theme";
+import { androidAppScript } from "@/lib/android-app";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: androidAppScript }} />
       </head>
       <body className="min-h-full flex flex-col">
         {children}

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Sem Panela</string>
     <string name="hostName">sempanela.app.br</string>
-    <string name="launch_url">https://sempanela.app.br/grupos</string>
+    <string name="launch_url">https://sempanela.app.br/grupos?origem=android</string>
     <string name="provider_authority">br.app.sempanela.fileprovider</string>
     <string name="asset_statements" translatable="false">
         [{

@@ -40,7 +40,7 @@ export default async function Home() {
             </div>
           </div>
         ))}
-        <p className="pt-4 text-center text-sm text-neutral-600">
+        <p className="play-hide pt-4 text-center text-sm text-neutral-600">
           30 dias grátis. Depois, <strong>{formatMoney(PRICE_CENTS)} por mês</strong> por grupo, com jogadores ilimitados. Só o organizador paga.
         </p>
         <p className="text-center text-xs text-neutral-500">

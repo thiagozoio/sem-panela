@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Card, LinkButton } from "@/components/ui";
 import { CopyField, ShareButtons } from "@/components/share";
+import { formatDay } from "@/lib/format";
 import { getGroupContext } from "@/lib/groups";
 import { siteUrl } from "@/lib/site";
 import { SettingsForm } from "./settings-form";
@@ -48,7 +49,18 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
       </Card>
 
       <div id="assinatura" className="scroll-mt-4">
-        <BillingCard supabase={supabase} group={group} subscription={subscription} userName={user.name} />
+        <div className="play-hide">
+          <BillingCard supabase={supabase} group={group} subscription={subscription} userName={user.name} />
+        </div>
+        {/* No app Android da Google Play a assinatura não é vendida (ver src/lib/android-app.ts). */}
+        <Card className="play-only space-y-2 text-sm">
+          <h2 className="font-semibold">Assinatura do Sem Panela</h2>
+          <p>
+            {subscription.status === "read_only" ? "Venceu em " : "Paga até "}
+            <strong>{formatDay(group.paid_until)}</strong>.
+          </p>
+          <p className="text-neutral-600">A assinatura não é feita pelo app Android.</p>
+        </Card>
       </div>
     </div>
   );
