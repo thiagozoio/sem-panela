@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, supportMailto, supportSubject } from "@/lib/support";
 import { Badge, Button, Card } from "@/components/ui";
 import { PayInstructions } from "@/components/billing-banner";
 import { asaasEnabled, asaasSandbox, subscriptionPayments, type AsaasPayment } from "@/lib/asaas";
@@ -36,6 +37,7 @@ export async function BillingCard({
         <p className="text-neutral-600">
           Para renovar: <PayInstructions groupName={group.name} /> A liberação é feita à mão em até 1 dia útil.
         </p>
+        <BillingHelp groupName={group.name} />
       </Card>
     );
   }
@@ -114,6 +116,19 @@ export async function BillingCard({
           />
         </>
       )}
+      <BillingHelp groupName={group.name} />
     </Card>
+  );
+}
+
+function BillingHelp({ groupName }: { groupName: string }) {
+  return (
+    <p className="text-xs text-neutral-500">
+      Dúvida sobre a cobrança?{" "}
+      <a className="font-medium text-pitch-700 underline" href={supportMailto(supportSubject(groupName, "Assinatura"))}>
+        Fale com o suporte
+      </a>{" "}
+      ({SUPPORT_EMAIL}).
+    </p>
   );
 }

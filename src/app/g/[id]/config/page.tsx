@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Card, LinkButton } from "@/components/ui";
 import { CopyField, ShareButtons } from "@/components/share";
+import { SupportCard } from "@/components/support";
 import { getGroupContext } from "@/lib/groups";
 import { siteUrl } from "@/lib/site";
 import { SettingsForm } from "./settings-form";
@@ -50,6 +51,8 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
       <div id="assinatura" className="scroll-mt-4">
         <BillingCard supabase={supabase} group={group} subscription={subscription} userName={user.name} />
       </div>
+
+      <SupportCard groupName={group.name} />
     </div>
   );
 }

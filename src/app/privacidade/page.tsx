@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/ui";
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP, supportMailto } from "@/lib/support";
 
 export const metadata: Metadata = { title: "Política de privacidade" };
 
-const WHATSAPP = process.env.NEXT_PUBLIC_BILLING_WHATSAPP ?? "";
+const WHATSAPP = SUPPORT_WHATSAPP || (process.env.NEXT_PUBLIC_BILLING_WHATSAPP ?? "");
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -78,10 +79,13 @@ export default function PrivacyPage() {
         <Section title="Seus direitos">
           <p>
             Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados, ou tirar dúvidas sobre esta
-            política.
+            política. Escreva para{" "}
+            <a className="font-medium text-pitch-700 underline" href={supportMailto("Privacidade - Sem Panela")}>
+              {SUPPORT_EMAIL}
+            </a>
             {WHATSAPP && (
               <>
-                {" "}Fale com a gente pelo{" "}
+                {" "}ou fale com a gente pelo{" "}
                 <a className="font-medium text-pitch-700 underline" href={`https://wa.me/${WHATSAPP}`} target="_blank" rel="noreferrer">
                   WhatsApp
                 </a>
