@@ -1,11 +1,5 @@
 package br.app.sempanela;
 
-import com.google.androidbrowserhelper.trusted.NotificationPermissionRequestHandler;
-
+// Recebe do Chrome os avisos (notificações) do site para mostrar como sendo do app.
 public class DelegationService extends com.google.androidbrowserhelper.trusted.DelegationService {
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        registerExtraCommandHandler(new NotificationPermissionRequestHandler());
-    }
 }
