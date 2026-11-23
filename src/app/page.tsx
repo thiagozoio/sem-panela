@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SupportFooterLink } from "@/components/support";
 import { redirect } from "next/navigation";
 import { LinkButton } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
@@ -45,6 +46,8 @@ export default async function Home() {
         </p>
         <p className="text-center text-xs text-neutral-500">
           <Link href="/privacidade" className="underline">Política de privacidade</Link>
+          {" · "}
+          <SupportFooterLink />
         </p>
       </section>
     </main>

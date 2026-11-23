@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Card, Field, Input, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { PushToggle } from "@/components/push-toggle";
+import { SupportCard } from "@/components/support";
 import { getCurrentUser, getSessionUser, safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isLinkEmail } from "@/lib/player-link";
@@ -71,6 +72,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/perfil">
           <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="settings" />
         </Card>
       )}
+      {user.name && <SupportCard />}
     </AppShell>
   );
 }

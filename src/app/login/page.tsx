@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SupportFooterLink } from "@/components/support";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui";
@@ -49,6 +50,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       </p>
       <p className="text-center text-xs text-neutral-500">
         <Link href="/privacidade" className="underline">Política de privacidade</Link>
+          {" · "}
+          <SupportFooterLink />
       </p>
     </main>
   );
