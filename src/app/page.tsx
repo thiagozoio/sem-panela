@@ -55,7 +55,19 @@ export default async function Home() {
             <strong>{formatMoney(FOUNDER_PRICE_CENTS)} por mês para sempre</strong>. Ainda {spotsText(spotsLeft)}.
           </p>
         )}
+        <Link
+          href="/como-usar"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-black/5"
+        >
+          <span className="text-2xl">📲</span>
+          <span>
+            <span className="block font-semibold">Como usar e instalar no celular</span>
+            <span className="block text-sm text-neutral-600">Passo a passo para jogador e organizador, com imagens.</span>
+          </span>
+        </Link>
         <p className="text-center text-xs text-neutral-500">
+          <Link href="/como-usar" className="underline">Como usar</Link>
+          {" · "}
           <Link href="/privacidade" className="underline">Política de privacidade</Link>
           {" · "}
           <SupportFooterLink />

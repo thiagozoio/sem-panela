@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { themeScript } from "@/lib/theme";
+import { installCaptureScript } from "@/lib/install";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeScript + installCaptureScript }} />
       </head>
       <body className="min-h-full flex flex-col">
         {children}

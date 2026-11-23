@@ -49,6 +49,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         É jogador e não quer usar e-mail? Peça ao organizador o seu <strong>link de acesso</strong> pelo WhatsApp.
       </p>
       <p className="text-center text-xs text-neutral-500">
+        <Link href="/como-usar" className="underline">Como usar e instalar</Link>
+          {" · "}
         <Link href="/privacidade" className="underline">Política de privacidade</Link>
           {" · "}
           <SupportFooterLink />
