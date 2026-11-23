@@ -6,6 +6,7 @@ import { Card, Field, Input, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { PushToggle } from "@/components/push-toggle";
 import { SupportCard } from "@/components/support";
+import { InstallApp } from "@/components/install-app";
 import { getCurrentUser, getSessionUser, safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isLinkEmail } from "@/lib/player-link";
@@ -70,6 +71,13 @@ export default async function ProfilePage({ searchParams }: PageProps<"/perfil">
         <Card className="space-y-2">
           <h2 className="font-semibold">Avisos no celular</h2>
           <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="settings" />
+        </Card>
+      )}
+      {user.name && (
+        <Card className="space-y-2">
+          <h2 className="font-semibold">App no celular</h2>
+          <p className="text-sm text-neutral-600">Salve o Sem Panela na tela inicial para abrir direto, em tela cheia, como um aplicativo.</p>
+          <InstallApp compact />
         </Card>
       )}
       {user.name && <SupportCard />}

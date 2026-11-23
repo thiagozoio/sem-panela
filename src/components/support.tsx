@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buttonStyles, Card } from "./ui";
 import { WhatsAppLink } from "./share";
 import { SUPPORT_EMAIL, supportMailto, supportSubject, supportWhatsAppLink } from "@/lib/support";
@@ -9,9 +10,12 @@ export function SupportCard({ groupName, text }: { groupName?: string; text?: st
     <Card className="space-y-3">
       <h2 className="font-semibold">Ajuda e suporte</h2>
       <p className="text-sm text-neutral-600">
-        {text ?? "Dúvidas, problemas ou sugestões para o app? Fale com a gente, respondemos o quanto antes."}
+        {text ?? "Veja o passo a passo de como usar e instalar no celular. Dúvidas, problemas ou sugestões? Fale com a gente, respondemos o quanto antes."}
       </p>
       <div className="flex flex-wrap gap-2">
+        <Link className={buttonStyles.secondary} href="/como-usar">
+          📖 Como usar o app
+        </Link>
         <a className={buttonStyles.secondary} href={supportMailto(supportSubject(groupName))}>
           ✉️ Falar com o suporte
         </a>
