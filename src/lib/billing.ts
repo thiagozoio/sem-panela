@@ -12,6 +12,8 @@ export type BillingAccount = {
   status: "active" | "canceled";
   payer_name: string;
   payer_doc: string;
+  /** Valor combinado no Asaas (centavos). Vazio antes da migração 20261123000000. */
+  price_cents?: number | null;
 };
 
 /** Endereço da API pelo tipo da chave: `$aact_hmlg_` é do sandbox, o resto é produção. */

@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { LinkButton } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
-import { PRICE_CENTS } from "@/lib/subscription";
+import { asaasEnabled } from "@/lib/asaas";
+import { founderSpotsLeft, spotsText } from "@/lib/founders";
+import { FOUNDER_PRICE_CENTS, FOUNDER_SPOTS, PRICE_CENTS } from "@/lib/subscription";
+import { createClient } from "@/lib/supabase/server";
 
 const features = [
   ["📋", "Lista de presença", "O jogador confirma com um toque. Lotou? Vai para a lista de espera, com prioridade para mensalista."],
@@ -15,6 +18,8 @@ const features = [
 
 export default async function Home() {
   if (await getCurrentUser()) redirect("/grupos");
+  // A vaga de fundador é pega ao assinar pelo app, então só aparece com a cobrança automática ligada.
+  const spotsLeft = asaasEnabled() ? await founderSpotsLeft(await createClient()) : 0;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -44,6 +49,12 @@ export default async function Home() {
         <p className="pt-4 text-center text-sm text-neutral-600">
           30 dias grátis. Depois, <strong>{formatMoney(PRICE_CENTS)} por mês</strong> por grupo, com jogadores ilimitados. Só o organizador paga.
         </p>
+        {spotsLeft > 0 && (
+          <p className="rounded-2xl bg-pitch-50 p-4 text-center text-sm text-pitch-900 ring-1 ring-pitch-100">
+            <strong>Preço de fundador:</strong> os {FOUNDER_SPOTS} primeiros grupos que assinarem pagam{" "}
+            <strong>{formatMoney(FOUNDER_PRICE_CENTS)} por mês para sempre</strong>. Ainda {spotsText(spotsLeft)}.
+          </p>
+        )}
         <p className="text-center text-xs text-neutral-500">
           <Link href="/privacidade" className="underline">Política de privacidade</Link>
           {" · "}

@@ -4,7 +4,8 @@ import { PayInstructions } from "@/components/billing-banner";
 import { asaasEnabled, asaasSandbox, subscriptionPayments, type AsaasPayment } from "@/lib/asaas";
 import { openPayment, type BillingAccount } from "@/lib/billing";
 import { formatDay, formatMoney, todayInBrazil } from "@/lib/format";
-import { PRICE_CENTS, type SubscriptionState } from "@/lib/subscription";
+import { founderSpotsLeft, isFounder, spotsText } from "@/lib/founders";
+import { FOUNDER_PRICE_CENTS, FOUNDER_SPOTS, PRICE_CENTS, type SubscriptionState } from "@/lib/subscription";
 import type { Group } from "@/lib/types";
 import type { createClient } from "@/lib/supabase/server";
 import { cancelBilling } from "./billing-actions";
@@ -29,13 +30,15 @@ export async function BillingCard({
     </p>
   );
 
+  const founder = await isFounder(supabase, group.id);
+
   if (!asaasEnabled()) {
     return (
       <Card className="space-y-2 text-sm">
         <h2 className="font-semibold">Assinatura do Sem Panela</h2>
         {paidLine}
         <p className="text-neutral-600">
-          Para renovar: <PayInstructions groupName={group.name} /> A liberação é feita à mão em até 1 dia útil.
+          Para renovar: <PayInstructions groupName={group.name} priceCents={founder ? FOUNDER_PRICE_CENTS : PRICE_CENTS} /> A liberação é feita à mão em até 1 dia útil.
         </p>
         <BillingHelp groupName={group.name} />
       </Card>
@@ -49,6 +52,9 @@ export async function BillingCard({
     .eq("group_id", group.id)
     .maybeSingle<BillingAccount>();
   const active = account?.status === "active" && !!account.asaas_subscription_id;
+  // Quem ainda não assinou: fundador já garantido ou vaga sobrando paga o preço de fundador.
+  const spotsLeft = active || founder ? 0 : await founderSpotsLeft(supabase);
+  const newPrice = founder || spotsLeft > 0 ? FOUNDER_PRICE_CENTS : PRICE_CENTS;
 
   let pending: AsaasPayment | null = null;
   if (active) {
@@ -63,7 +69,10 @@ export async function BillingCard({
     <Card className="space-y-3 text-sm">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">Assinatura do Sem Panela</h2>
-        {active ? <Badge tone="green">Ativa</Badge> : <Badge tone="amber">Sem assinatura</Badge>}
+        <div className="flex gap-1">
+          {founder && <Badge tone="green">Fundador</Badge>}
+          {active ? <Badge tone="green">Ativa</Badge> : <Badge tone="amber">Sem assinatura</Badge>}
+        </div>
       </div>
       {asaasSandbox() && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Modo de teste: nenhum pagamento é de verdade.</p>
@@ -73,7 +82,7 @@ export async function BillingCard({
       {active ? (
         <>
           <p className="text-neutral-600">
-            {formatMoney(PRICE_CENTS)} por mês no {account.billing_type === "CREDIT_CARD" ? "cartão de crédito" : "Pix"}, em nome de{" "}
+            {formatMoney(account.price_cents ?? PRICE_CENTS)} por mês no {account.billing_type === "CREDIT_CARD" ? "cartão de crédito" : "Pix"}, em nome de{" "}
             {account.payer_name}. Quando o pagamento cai, o grupo é liberado na hora.
           </p>
           {pending && (
@@ -105,14 +114,27 @@ export async function BillingCard({
         </>
       ) : (
         <>
+          {founder ? (
+            <p className="rounded-xl bg-pitch-50 px-3 py-2 ring-1 ring-pitch-100">
+              Seu grupo é <strong>fundador</strong>: paga {formatMoney(FOUNDER_PRICE_CENTS)} por mês para sempre.
+            </p>
+          ) : (
+            spotsLeft > 0 && (
+              <p className="rounded-xl bg-pitch-50 px-3 py-2 ring-1 ring-pitch-100">
+                <strong>Preço de fundador:</strong> os {FOUNDER_SPOTS} primeiros grupos que assinam pagam{" "}
+                <strong>{formatMoney(FOUNDER_PRICE_CENTS)} por mês para sempre</strong> (o normal é {formatMoney(PRICE_CENTS)}).{" "}
+                {spotsText(spotsLeft).replace(/^r/, "R")}.
+              </p>
+            )
+          )}
           <p className="text-neutral-600">
-            {formatMoney(PRICE_CENTS)} por mês, por Pix ou cartão. O primeiro vencimento é no fim do período já pago, e o grupo é liberado
+            {formatMoney(newPrice)} por mês, por Pix ou cartão. O primeiro vencimento é no fim do período já pago, e o grupo é liberado
             assim que o pagamento cai.
           </p>
           <SubscribeForm
             groupId={group.id}
             defaultName={account?.payer_name || userName}
-            label={subscription.status === "read_only" ? "Pagar e liberar o grupo" : `Assinar por ${formatMoney(PRICE_CENTS)}/mês`}
+            label={subscription.status === "read_only" ? "Pagar e liberar o grupo" : `Assinar por ${formatMoney(newPrice)}/mês`}
           />
         </>
       )}
