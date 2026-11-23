@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sem Panela</string>
+    <string name="hostName">sempanela.app.br</string>
+    <string name="launch_url">https://sempanela.app.br/grupos</string>
+    <string name="provider_authority">br.app.sempanela.fileprovider</string>
+    <string name="asset_statements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {\"namespace\": \"web\", \"site\": \"https://sempanela.app.br\"}
+        }]
+    </string>
+</resources>
