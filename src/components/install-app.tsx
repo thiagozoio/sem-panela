@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "./ui";
 import { detectPlatform, type Platform } from "@/lib/install";
+import { APP_NAME, SITE_HOST } from "@/lib/brand";
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 declare global {
@@ -62,7 +63,7 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
   if (platform === "installed" || done) {
     return (
       <p className="rounded-xl bg-pitch-50 px-3 py-2 text-sm text-pitch-900 ring-1 ring-pitch-100">
-        ✅ {done ? "Pronto! O Sem Panela foi instalado. Procure o ícone na tela inicial." : "Você já está usando o Sem Panela instalado no celular."}
+        ✅ {done ? `Pronto! O ${APP_NAME} foi instalado. Procure o ícone na tela inicial.` : `Você já está usando o ${APP_NAME} instalado no celular.`}
       </p>
     );
   }
@@ -107,7 +108,7 @@ function Steps({ platform }: { platform: Platform }) {
     case "ios-other":
       return (
         <p className="text-neutral-700">
-          No iPhone, abra <strong>sempanela.app.br</strong> no <strong>Safari</strong>, toque em <strong>Compartilhar</strong> e depois em{" "}
+          No iPhone, abra <strong>{SITE_HOST}</strong> no <strong>Safari</strong>, toque em <strong>Compartilhar</strong> e depois em{" "}
           <strong>Adicionar à Tela de Início</strong>. Em alguns navegadores o mesmo botão Compartilhar também tem essa opção.
         </p>
       );
@@ -135,7 +136,7 @@ function Steps({ platform }: { platform: Platform }) {
     default:
       return (
         <p className="text-neutral-700">
-          Abra <strong>sempanela.app.br</strong> no navegador do celular: no iPhone pelo Safari (Compartilhar › Adicionar à Tela de Início) e no
+          Abra <strong>{SITE_HOST}</strong> no navegador do celular: no iPhone pelo Safari (Compartilhar › Adicionar à Tela de Início) e no
           Android pelo Chrome (três pontinhos › Instalar app).
         </p>
       );

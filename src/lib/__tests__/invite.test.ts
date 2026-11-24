@@ -20,6 +20,7 @@ describe("invite", () => {
   it("lê o código do link colado ou do código solto", () => {
     expect(inviteCodeFromText("https://sempanela.app.br/convite/f84c1d2b06")).toBe("f84c1d2b06");
     expect(inviteCodeFromText(" sempanela.app.br/convite/f84c1d2b06?x=1 ")).toBe("f84c1d2b06");
+    expect(inviteCodeFromText("https://coletinho.com.br/convite/f84c1d2b06")).toBe("f84c1d2b06");
     expect(inviteCodeFromText("f84c1d2b06")).toBe("f84c1d2b06");
     expect(inviteCodeFromText("oi, cadê o link?")).toBeNull();
   });

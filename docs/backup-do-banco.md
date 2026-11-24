@@ -14,7 +14,7 @@ Arquivos: `.github/workflows/backup-banco.yml` (agenda), `scripts/backup-banco.s
 
 ### 1. Pegar o endereço do banco no Supabase
 
-1. Entre em <https://supabase.com/dashboard> e abra o projeto do Sem Panela.
+1. Entre em <https://supabase.com/dashboard> e abra o projeto do Coletinho.
 2. Clique no botão **Connect** no alto da página.
 3. Na aba **Connection String**, procure **Session pooler** e copie o endereço. Ele é parecido com:
    `postgresql://postgres.abcdefgh:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`

@@ -2,6 +2,7 @@ import { formatGameDate, formatMoney } from "./format";
 import type { ListEntry } from "./attendance";
 import { byPosition, positionInfo, type Sport } from "./sports";
 import type { Team } from "./types";
+import { APP_NAME } from "./brand";
 
 export function listMessage(
   groupName: string,
@@ -81,7 +82,7 @@ export function teamsMessage(groupName: string, startsAt: string, teams: Team[],
       lines.push(info?.value === "goleiro" ? `🧤 ${p.name}` : `• ${p.name}${info ? ` (${info.label.toLowerCase()})` : ""}`);
     });
   }
-  lines.push("", "Times do Sem Panela, sem panelinha 😉");
+  lines.push("", `Times sorteados no ${APP_NAME}, sem panelinha 😉`);
   return lines.join("\n");
 }
 

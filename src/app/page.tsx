@@ -2,6 +2,8 @@ import Link from "next/link";
 import { SupportFooterLink } from "@/components/support";
 import { redirect } from "next/navigation";
 import { LinkButton } from "@/components/ui";
+import { BrandMark } from "@/components/brand-mark";
+import { APP_NAME, SLOGAN } from "@/lib/brand";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { asaasEnabled } from "@/lib/asaas";
@@ -23,10 +25,16 @@ export default async function Home() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <section className="bg-pitch-700 px-4 pb-12 pt-14 text-white">
+      <section
+        className="px-4 pb-12 pt-10 text-white"
+        style={{ background: "repeating-linear-gradient(90deg, #13693a 0 48px, #177a44 48px 96px)" }}
+      >
         <div className="mx-auto max-w-xl space-y-5">
-          <p className="text-sm font-semibold uppercase tracking-widest text-white/80">Sem Panela ⚽</p>
-          <h1 className="text-3xl font-extrabold leading-tight">A pelada organizada e paga em dia.</h1>
+          <div className="flex items-center gap-3">
+            <BrandMark className="h-16 w-auto drop-shadow" />
+            <p className="text-2xl font-extrabold tracking-tight">{APP_NAME}</p>
+          </div>
+          <h1 className="text-3xl font-extrabold leading-tight">{SLOGAN}</h1>
           <p className="text-white/80">
             Lista de presença, sorteio de times equilibrados e controle de quem pagou, tudo num link para o grupo do WhatsApp.
           </p>

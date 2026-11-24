@@ -2,6 +2,7 @@ import { brazilDateTime } from "./matches";
 import { formatGameDate, formatMoney, TZ } from "./format";
 import { GRACE_DAYS } from "./subscription";
 import type { ListEntry } from "./attendance";
+import { APP_NAME } from "./brand";
 
 /** O que vai para o service worker (public/sw.js). */
 export type PushPayload = {
@@ -110,12 +111,12 @@ export const notify = {
   subscription(groupId: string, groupName: string, daysLeft: number): PushPayload {
     const body =
       daysLeft > 0
-        ? `A assinatura do Sem Panela vence em ${daysLeft} dia${daysLeft > 1 ? "s" : ""}. Renove para a pelada não parar.`
+        ? `A assinatura do ${APP_NAME} vence em ${daysLeft} dia${daysLeft > 1 ? "s" : ""}. Renove para a pelada não parar.`
         : daysLeft === 0
-          ? "A assinatura do Sem Panela vence hoje. Renove para a pelada não parar."
+          ? `A assinatura do ${APP_NAME} vence hoje. Renove para a pelada não parar.`
           : daysLeft === -GRACE_DAYS
             ? "Último dia: amanhã a pelada fica só leitura no app se a assinatura não for renovada."
-            : `A assinatura do Sem Panela venceu. Em ${GRACE_DAYS + daysLeft + 1} dias a pelada fica só leitura no app.`;
+            : `A assinatura do ${APP_NAME} venceu. Em ${GRACE_DAYS + daysLeft + 1} dias a pelada fica só leitura no app.`;
     return { title: groupName, body, url: `${groupUrl(groupId)}/config`, tag: `assinatura-${groupId}` };
   },
 

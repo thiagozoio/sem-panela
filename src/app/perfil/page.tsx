@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isLinkEmail } from "@/lib/player-link";
 import { pushEnabled, VAPID_PUBLIC_KEY } from "@/lib/push";
 import { PasswordForm } from "./password-form";
+import { APP_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Perfil" };
 
@@ -76,7 +77,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/perfil">
       {user.name && (
         <Card className="space-y-2">
           <h2 className="font-semibold">App no celular</h2>
-          <p className="text-sm text-neutral-600">Salve o Sem Panela na tela inicial para abrir direto, em tela cheia, como um aplicativo.</p>
+          <p className="text-sm text-neutral-600">Salve o {APP_NAME} na tela inicial para abrir direto, em tela cheia, como um aplicativo.</p>
           <InstallApp compact />
         </Card>
       )}

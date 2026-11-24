@@ -17,7 +17,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 if [ "$("${P}psql" "$DEST" -Atc "select to_regclass('public.groups') is not null")" = "t" ]; then
-  echo "O banco de destino já tem as tabelas do Sem Panela. Restaure num projeto novo." >&2
+  echo "O banco de destino já tem as tabelas do Coletinho. Restaure num projeto novo." >&2
   exit 1
 fi
 

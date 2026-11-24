@@ -1,6 +1,10 @@
+import { APP_NAME } from "./brand";
+
 // Link pessoal de acesso do jogador (sem e-mail). A conta criada pelo link usa um
 // e-mail interno que nunca recebe mensagens; ele só serve de chave para o Supabase.
 
+// Fica com o domínio antigo de propósito: as contas já criadas pelo link usam este
+// e-mail, e trocar o domínio faria esses jogadores perderem o acesso.
 export const LINK_EMAIL_DOMAIN = "jogador.sempanela.app.br";
 
 export function linkEmail(memberId: string): string {
@@ -20,7 +24,7 @@ export function isLinkToken(token: string): boolean {
 export function accessMessage(memberName: string, groupName: string, url: string): string {
   const first = memberName.trim().split(/\s+/)[0] || "jogador";
   return (
-    `Oi, ${first}! Esse é o seu acesso à pelada ${groupName} no Sem Panela. ` +
+    `Oi, ${first}! Esse é o seu acesso à pelada ${groupName} no ${APP_NAME}. ` +
     `É só tocar no link, não precisa de senha nem e-mail:\n${url}\n\n` +
     `O link é só seu, não repasse. Vale por 7 dias.`
   );

@@ -3,6 +3,7 @@
 import { getSessionUser } from "./auth";
 import { createClient } from "./supabase/server";
 import { sendPush } from "./push";
+import { APP_NAME } from "./brand";
 
 type BrowserSubscription = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
 
@@ -31,7 +32,7 @@ export async function sendTestPush(): Promise<boolean> {
   const session = await getSessionUser();
   if (!session) return false;
   const sent = await sendPush([session.id], {
-    title: "Sem Panela",
+    title: APP_NAME,
     body: "Pronto! Os avisos da pelada vão chegar assim. ⚽",
     url: "/grupos",
     tag: "teste",

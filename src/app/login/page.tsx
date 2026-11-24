@@ -7,6 +7,8 @@ import { getCurrentUser, safeNext } from "@/lib/auth";
 import { SubmitButton } from "@/components/submit";
 import { signInWithGoogle } from "./actions";
 import { LoginForm } from "./login-form";
+import { APP_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
 
 const GOOGLE_LOGIN = process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "1";
 
@@ -20,8 +22,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-10">
       <div className="text-center">
-        <p className="text-4xl">⚽</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">Sem Panela</h1>
+        <BrandMark className="mx-auto h-14 w-auto" />
+        <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">{APP_NAME}</h1>
         <p className="text-sm text-neutral-600">
           {target.startsWith("/convite/")
             ? "Você foi convidado para uma pelada. Entre e você cai direto nela."

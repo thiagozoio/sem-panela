@@ -10,8 +10,9 @@ import type { Group } from "@/lib/types";
 import type { createClient } from "@/lib/supabase/server";
 import { cancelBilling } from "./billing-actions";
 import { SubscribeForm } from "./subscribe-form";
+import { APP_NAME } from "@/lib/brand";
 
-/** Cartão "Assinatura do Sem Panela" nos ajustes: Pix manual ou a assinatura automática do Asaas. */
+/** Cartão "Assinatura do Coletinho" nos ajustes: Pix manual ou a assinatura automática do Asaas. */
 export async function BillingCard({
   supabase,
   group,
@@ -35,7 +36,7 @@ export async function BillingCard({
   if (!asaasEnabled()) {
     return (
       <Card className="space-y-2 text-sm">
-        <h2 className="font-semibold">Assinatura do Sem Panela</h2>
+        <h2 className="font-semibold">Assinatura do {APP_NAME}</h2>
         {paidLine}
         <p className="text-neutral-600">
           Para renovar: <PayInstructions groupName={group.name} priceCents={founder ? FOUNDER_PRICE_CENTS : PRICE_CENTS} /> A liberação é feita à mão em até 1 dia útil.
@@ -68,7 +69,7 @@ export async function BillingCard({
   return (
     <Card className="space-y-3 text-sm">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-semibold">Assinatura do Sem Panela</h2>
+        <h2 className="font-semibold">Assinatura do {APP_NAME}</h2>
         <div className="flex gap-1">
           {founder && <Badge tone="green">Fundador</Badge>}
           {active ? <Badge tone="green">Ativa</Badge> : <Badge tone="amber">Sem assinatura</Badge>}
