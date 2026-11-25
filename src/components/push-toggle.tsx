@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "./ui";
 import { removePushSubscription, savePushSubscription, sendTestPush } from "@/lib/push-actions";
+import { APP_NAME } from "@/lib/brand";
 
 type Status = "loading" | "unsupported" | "ios-install" | "denied" | "off" | "on";
 
@@ -142,7 +143,7 @@ export function PushToggle({ publicKey, variant }: { publicKey: string; variant:
         {status === "ios-install" ? (
           <p>
             No iPhone, os avisos funcionam com o app instalado: toque em <strong>Compartilhar</strong> e depois em{" "}
-            <strong>Adicionar à Tela de Início</strong>. Abra o Sem Panela por lá e ative aqui.
+            <strong>Adicionar à Tela de Início</strong>. Abra o {APP_NAME} por lá e ative aqui.
           </p>
         ) : (
           <p>Lembrete para confirmar presença, times sorteados e vaga aberta na lista de espera.</p>
@@ -168,14 +169,14 @@ export function PushToggle({ publicKey, variant }: { publicKey: string; variant:
       {status === "off" && <p>Receba no celular o lembrete para confirmar presença, os times sorteados e quando abrir vaga na lista.</p>}
       {status === "denied" && (
         <p>
-          Os avisos estão bloqueados para o Sem Panela. Libere nas configurações de notificação do celular (ou do navegador) e
+          Os avisos estão bloqueados para o {APP_NAME}. Libere nas configurações de notificação do celular (ou do navegador) e
           volte aqui.
         </p>
       )}
       {status === "ios-install" && (
         <p>
           No iPhone, os avisos só funcionam com o app instalado na tela de início (iOS 16.4 ou mais novo): toque em{" "}
-          <strong>Compartilhar</strong>, depois em <strong>Adicionar à Tela de Início</strong>, e abra o Sem Panela por lá.
+          <strong>Compartilhar</strong>, depois em <strong>Adicionar à Tela de Início</strong>, e abra o {APP_NAME} por lá.
         </p>
       )}
       {status === "unsupported" && <p>Este navegador não aceita notificações. Tente pelo Chrome no Android ou pelo app instalado no iPhone.</p>}

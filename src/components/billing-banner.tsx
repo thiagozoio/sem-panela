@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { formatDay, formatMoney } from "@/lib/format";
 import { GRACE_DAYS, PRICE_CENTS, type SubscriptionState } from "@/lib/subscription";
+import { APP_NAME } from "@/lib/brand";
 
 export const BILLING_PIX_KEY = process.env.NEXT_PUBLIC_BILLING_PIX_KEY ?? "";
 export const BILLING_WHATSAPP = process.env.NEXT_PUBLIC_BILLING_WHATSAPP ?? "";
 
 export function PayInstructions({ groupName, priceCents = PRICE_CENTS }: { groupName: string; priceCents?: number }) {
-  const text = `Oi! Segue o comprovante da mensalidade do Sem Panela do grupo "${groupName}".`;
+  const text = `Oi! Segue o comprovante da mensalidade do ${APP_NAME} do grupo "${groupName}".`;
   return (
     <span>
       Faça um Pix de <strong>{formatMoney(priceCents)}</strong>

@@ -16,6 +16,7 @@ import { todayInBrazil } from "@/lib/format";
 import { getGroupContext } from "@/lib/groups";
 import { FOUNDER_PRICE_CENTS, PRICE_CENTS } from "@/lib/subscription";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { APP_NAME } from "@/lib/brand";
 
 export type SubscribeState = { error?: string };
 
@@ -94,7 +95,7 @@ export async function subscribe(_prev: SubscribeState, fd: FormData): Promise<Su
         value: priceCents / 100,
         nextDueDate: firstDueDate(group.paid_until, todayInBrazil()),
         cycle: "MONTHLY",
-        description: `Sem Panela · ${group.name}`,
+        description: `${APP_NAME} · ${group.name}`,
         externalReference: group.id,
       });
 

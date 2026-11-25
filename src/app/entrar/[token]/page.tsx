@@ -6,6 +6,8 @@ import { getSessionUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isLinkToken, linkEmail } from "@/lib/player-link";
+import { APP_NAME } from "@/lib/brand";
+import { BrandMark } from "@/components/brand-mark";
 
 export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 
@@ -75,8 +77,8 @@ export default async function EnterPage({ params, searchParams }: PageProps<"/en
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-10">
       <div className="text-center">
-        <p className="text-4xl">⚽</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">Sem Panela</h1>
+        <BrandMark className="mx-auto h-14 w-auto" />
+        <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">{APP_NAME}</h1>
       </div>
       <Card>
         {info ? (

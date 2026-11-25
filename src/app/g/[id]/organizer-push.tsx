@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Card, ErrorText, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit";
 import { pushMessage, pushPending } from "./actions";
+import { APP_NAME } from "@/lib/brand";
 
 /** Avisos no celular que o organizador manda na hora. */
 export function OrganizerPush({ groupId, gameId, pending }: { groupId: string; gameId: string; pending: number }) {
@@ -34,7 +35,7 @@ export function OrganizerPush({ groupId, gameId, pending }: { groupId: string; g
             {messageState.message && <p className="text-pitch-700">{messageState.message}</p>}
             <ErrorText>{messageState.error}</ErrorText>
           </form>
-          <p className="text-xs text-neutral-500">Só chega para quem ativou os avisos no Sem Panela.</p>
+          <p className="text-xs text-neutral-500">Só chega para quem ativou os avisos no {APP_NAME}.</p>
         </div>
       </details>
     </Card>

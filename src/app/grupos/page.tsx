@@ -11,6 +11,7 @@ import { WEEKDAYS } from "@/lib/format";
 import type { Group } from "@/lib/types";
 import { INVITE_COOKIE, inviteCodeFromText, isInviteCode } from "@/lib/invite";
 import { isLinkEmail } from "@/lib/player-link";
+import { SITE_HOST } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Minhas peladas" };
 
@@ -58,7 +59,7 @@ export default async function GroupsPage({ searchParams }: PageProps<"/grupos">)
             (ele termina em <span className="whitespace-nowrap">/convite/…</span>) ou cole o link aqui:
           </p>
           <form action={openInvite} className="flex gap-2">
-            <Input name="invite" placeholder="sempanela.app.br/convite/…" aria-label="Link de convite" required />
+            <Input name="invite" placeholder={`${SITE_HOST}/convite/…`} aria-label="Link de convite" required />
             <SubmitButton pendingText="Abrindo…">Entrar</SubmitButton>
           </form>
           {convite === "invalido" && <ErrorText>Esse não parece um link de convite. Confira com o organizador.</ErrorText>}

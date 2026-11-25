@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP, supportMailto } from "@/lib/support";
+import { APP_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Política de privacidade" };
 
@@ -19,13 +20,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function PrivacyPage() {
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-4 py-10">
-      <Link href="/" className="text-sm text-pitch-700">← Sem Panela</Link>
+      <Link href="/" className="text-sm text-pitch-700">← {APP_NAME}</Link>
       <h1 className="mt-2 text-2xl font-extrabold text-pitch-900">Política de privacidade</h1>
       <p className="mb-6 text-sm text-neutral-500">Atualizada em 28 de outubro de 2026.</p>
       <Card className="space-y-6">
-        <Section title="O que é o Sem Panela">
+        <Section title={`O que é o ${APP_NAME}`}>
           <p>
-            O Sem Panela é um app para organizar peladas: lista de presença, sorteio de times, resultados e controle de
+            O {APP_NAME} é um app para organizar peladas: lista de presença, sorteio de times, resultados e controle de
             pagamentos do grupo. Esta página explica quais dados usamos e por quê, de acordo com a LGPD (Lei 13.709/2018).
           </p>
         </Section>
@@ -80,7 +81,7 @@ export default function PrivacyPage() {
           <p>
             Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados, ou tirar dúvidas sobre esta
             política. Escreva para{" "}
-            <a className="font-medium text-pitch-700 underline" href={supportMailto("Privacidade - Sem Panela")}>
+            <a className="font-medium text-pitch-700 underline" href={supportMailto(`Privacidade - ${APP_NAME}`)}>
               {SUPPORT_EMAIL}
             </a>
             {WHATSAPP && (

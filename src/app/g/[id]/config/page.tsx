@@ -7,6 +7,7 @@ import { getGroupContext } from "@/lib/groups";
 import { siteUrl } from "@/lib/site";
 import { SettingsForm } from "./settings-form";
 import { BillingCard } from "./billing-card";
+import { APP_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -17,7 +18,7 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
   if (!isOrganizer) notFound();
 
   const inviteUrl = `${await siteUrl()}/convite/${group.invite_code}`;
-  const inviteText = `⚽ Entrem na lista da *${group.name}* pelo Sem Panela: ${inviteUrl}`;
+  const inviteText = `⚽ Entrem na lista da *${group.name}* pelo ${APP_NAME}: ${inviteUrl}`;
 
   return (
     <div className="space-y-4">

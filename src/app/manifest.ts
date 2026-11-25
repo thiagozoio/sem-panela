@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME, SLOGAN } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Sem Panela",
-    short_name: "Sem Panela",
-    description: "A pelada organizada e paga em dia.",
+    name: APP_NAME,
+    short_name: APP_NAME,
+    description: SLOGAN,
     id: "/",
     start_url: "/grupos",
     scope: "/",

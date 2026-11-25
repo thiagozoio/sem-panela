@@ -1,4 +1,4 @@
-// Service worker do Sem Panela: só recebe as notificações push e abre o app ao tocar.
+// Service worker do Coletinho: só recebe as notificações push e abre o app ao tocar.
 // Não faz cache de páginas (o app continua sempre online).
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -11,7 +11,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Sem Panela";
+  const title = data.title || "Coletinho";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",

@@ -1,12 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#13693a"/>
-  <circle cx="256" cy="256" r="150" fill="#fff"/>
-  <polygon points="256,186 322,234 297,312 215,312 190,234" fill="#13693a"/>
-  <g stroke="#13693a" stroke-width="14" stroke-linecap="round">
-    <line x1="256" y1="186" x2="256" y2="112"/>
-    <line x1="322" y1="234" x2="392" y2="211"/>
-    <line x1="297" y1="312" x2="340" y2="372"/>
-    <line x1="215" y1="312" x2="172" y2="372"/>
-    <line x1="190" y1="234" x2="120" y2="211"/>
+  <defs>
+    <path id="bib" d="M-26-102H-54Q-58-40-84-28V90Q-84 106-68 108Q0 116 68 108Q84 106 84 90V-28Q58-40 54-102H26Q0-14-26-102Z"/>
+    <pattern id="mesh" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="2.2" fill="#000" fill-opacity=".12"/>
+    </pattern>
+  </defs>
+  <clipPath id="c"><rect width="512" height="512" rx="112"/></clipPath>
+  <g clip-path="url(#c)"><rect width="512" height="512" fill="#13693a"/>
+    <rect x="0" width="64" height="512" fill="#177a44"/>
+    <rect x="128" width="64" height="512" fill="#177a44"/>
+    <rect x="256" width="64" height="512" fill="#177a44"/>
+    <rect x="384" width="64" height="512" fill="#177a44"/>
+  </g>
+  <g transform="translate(256 268) scale(1.12)">
+    <g transform="translate(-86 8) rotate(-16)">
+      <use href="#bib" transform="translate(6 10)" fill="#000" fill-opacity=".22"/>
+      <use href="#bib" fill="#2563eb"/>
+      <use href="#bib" fill="url(#mesh)"/>
+      <path d="M-54-102Q-58-40-84-28M84-28Q58-40 54-102M26-102Q0-14-26-102" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="7" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(86 8) rotate(16)">
+      <use href="#bib" transform="translate(6 10)" fill="#000" fill-opacity=".22"/>
+      <use href="#bib" fill="#ea580c"/>
+      <use href="#bib" fill="url(#mesh)"/>
+      <path d="M-54-102Q-58-40-84-28M84-28Q58-40 54-102M26-102Q0-14-26-102" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="7" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(0 -6) rotate(0)">
+      <use href="#bib" transform="translate(6 10)" fill="#000" fill-opacity=".22"/>
+      <use href="#bib" fill="#facc15"/>
+      <use href="#bib" fill="url(#mesh)"/>
+      <path d="M-54-102Q-58-40-84-28M84-28Q58-40 54-102M26-102Q0-14-26-102" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="7" stroke-linecap="round"/>
+    </g>
   </g>
 </svg>

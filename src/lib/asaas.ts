@@ -30,7 +30,7 @@ async function call<T>(method: "GET" | "POST" | "DELETE", path: string, body?: u
       access_token: key,
       "Content-Type": "application/json",
       // O Asaas exige User-Agent nas contas novas.
-      "User-Agent": "SemPanela",
+      "User-Agent": "Coletinho",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",

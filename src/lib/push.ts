@@ -2,6 +2,7 @@ import "server-only";
 import webpush from "web-push";
 import { createAdminClient, type AdminClient } from "./supabase/admin";
 import type { PushPayload } from "./notifications";
+import { SENDER_EMAIL } from "./brand";
 
 export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -12,7 +13,7 @@ function setup(): boolean {
   if (configured) return true;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!VAPID_PUBLIC_KEY || !privateKey) return false;
-  const contact = process.env.VAPID_SUBJECT ?? "mailto:nao-responda@sempanela.app.br";
+  const contact = process.env.VAPID_SUBJECT ?? `mailto:${SENDER_EMAIL}`;
   webpush.setVapidDetails(contact, VAPID_PUBLIC_KEY, privateKey);
   configured = true;
   return true;

@@ -10,10 +10,11 @@ import { formatMoney } from "@/lib/format";
 import { founderSpotsLeft, spotsText } from "@/lib/founders";
 import { FOUNDER_PRICE_CENTS, FOUNDER_SPOTS, PRICE_CENTS } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
+import { APP_NAME, SENDER_EMAIL, SITE_HOST } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "Como usar",
-  description: "Como instalar o Sem Panela no celular e usar como jogador ou organizador da pelada.",
+  description: "Como instalar o Coletinho no celular e usar como jogador ou organizador da pelada.",
 };
 
 const sections = [
@@ -86,9 +87,9 @@ export default async function HowToPage() {
       <section className="bg-pitch-700 px-4 pb-8 pt-10 text-white">
         <div className="mx-auto max-w-xl space-y-3">
           <Link href={loggedIn ? "/grupos" : "/"} className="text-sm text-white/80">
-            ← {loggedIn ? "Voltar para as peladas" : "Sem Panela"}
+            ← {loggedIn ? "Voltar para as peladas" : APP_NAME}
           </Link>
-          <h1 className="text-3xl font-extrabold leading-tight">Como usar o Sem Panela</h1>
+          <h1 className="text-3xl font-extrabold leading-tight">Como usar o {APP_NAME}</h1>
           <p className="text-white/80">
             Instale no celular e veja, passo a passo, como confirmar presença, sortear os times, anotar o placar e controlar quem pagou.
           </p>
@@ -108,7 +109,7 @@ export default async function HowToPage() {
       <div className="mx-auto w-full max-w-xl space-y-10 px-4 py-6 pb-16">
         <Section id="instalar" kicker="Para todo mundo" title="Instalar no celular como app">
           <p className="text-sm text-neutral-700">
-            O Sem Panela funciona direto no navegador, em <strong>sempanela.app.br</strong>, sem baixar nada da loja. Salvando na tela inicial,
+            O {APP_NAME} funciona direto no navegador, em <strong>{SITE_HOST}</strong>, sem baixar nada da loja. Salvando na tela inicial,
             ele ganha ícone e abre em tela cheia, igual a um aplicativo.
           </p>
           <Card className="space-y-3">
@@ -119,7 +120,7 @@ export default async function HowToPage() {
             {/* eslint-disable-next-line @next/next/no-img-element -- imagem estática */}
             <img
               src="/como-usar/instalar.webp"
-              alt="Passo a passo para salvar o Sem Panela na tela inicial do iPhone (Safari) e do Android (Chrome)"
+              alt="Passo a passo para salvar o Coletinho na tela inicial do iPhone (Safari) e do Android (Chrome)"
               loading="lazy"
               className="w-full rounded-xl ring-1 ring-black/10"
             />
@@ -129,7 +130,7 @@ export default async function HowToPage() {
             <Card className="space-y-2 text-sm text-neutral-700">
               <h3 className="font-semibold text-neutral-900">iPhone (Safari)</h3>
               <ol className="list-decimal space-y-1 pl-5">
-                <li>Abra sempanela.app.br no <strong>Safari</strong>.</li>
+                <li>Abra {SITE_HOST} no <strong>Safari</strong>.</li>
                 <li>
                   Toque em <strong>Compartilhar</strong> (quadrado com seta). Se não aparecer, toque antes em <strong>•••</strong>.
                 </li>
@@ -141,7 +142,7 @@ export default async function HowToPage() {
             <Card className="space-y-2 text-sm text-neutral-700">
               <h3 className="font-semibold text-neutral-900">Android (Chrome)</h3>
               <ol className="list-decimal space-y-1 pl-5">
-                <li>Abra sempanela.app.br no <strong>Chrome</strong>.</li>
+                <li>Abra {SITE_HOST} no <strong>Chrome</strong>.</li>
                 <li>
                   Toque nos <strong>três pontinhos</strong> no canto de cima.
                 </li>
@@ -164,7 +165,7 @@ export default async function HowToPage() {
             <List>
               <li>
                 <strong>E-mail:</strong> digite o e-mail e toque em <strong>Receber link de acesso</strong>. Chega um e-mail de
-                nao-responda@sempanela.app.br com um link e um código de 6 dígitos. Use qualquer um dos dois.
+                {SENDER_EMAIL} com um link e um código de 6 dígitos. Use qualquer um dos dois.
               </li>
               <li>
                 <strong>Google:</strong> toque em <strong>Entrar com Google</strong>, quando o botão aparecer.
@@ -178,7 +179,7 @@ export default async function HowToPage() {
               Quer entrar sem esperar o código? Em <strong>Perfil › Senha</strong> você cria uma senha e passa a entrar com e-mail e senha. Na
               primeira vez, o app pergunta como te chamam na pelada: é o nome que aparece na lista.
             </p>
-            <Shot src="login" alt="Tela de entrada do Sem Panela" />
+            <Shot src="login" alt="Tela de entrada do Coletinho" />
           </Card>
         </Section>
 
@@ -237,7 +238,7 @@ export default async function HowToPage() {
               sorteados e quando abrir vaga. No iPhone, os avisos só funcionam com o app instalado na Tela de Início.
             </p>
             <p>
-              Joga em mais de uma pelada? Toque em <strong>Sem Panela ⚽</strong> no topo para ver todas. O botão 🌓 troca entre tema claro e
+              Joga em mais de uma pelada? Toque em <strong>{APP_NAME}</strong> no topo para ver todas. O botão 🌓 troca entre tema claro e
               escuro.
             </p>
           </Step>
@@ -376,12 +377,12 @@ export default async function HowToPage() {
             <p>
               {automatic ? (
                 <>
-                  Em <strong>Ajustes › Assinatura do Sem Panela</strong> você assina por Pix ou cartão de crédito. Quando o pagamento cai, a pelada
+                  Em <strong>Ajustes › Assinatura do {APP_NAME}</strong> você assina por Pix ou cartão de crédito. Quando o pagamento cai, a pelada
                   é liberada na hora.
                 </>
               ) : (
                 <>
-                  Em <strong>Ajustes › Assinatura do Sem Panela</strong> você vê até quando está pago e como fazer o Pix. A liberação é feita em
+                  Em <strong>Ajustes › Assinatura do {APP_NAME}</strong> você vê até quando está pago e como fazer o Pix. A liberação é feita em
                   até 1 dia útil.
                 </>
               )}
@@ -396,7 +397,7 @@ export default async function HowToPage() {
         <Section id="duvidas" title="Dúvidas comuns">
           <div className="space-y-2">
             <Faq q="O e-mail de acesso não chegou.">
-              Olhe no spam ou em Promoções. O remetente é nao-responda@sempanela.app.br. Se não achar, peça de novo e confira se o e-mail foi
+              Olhe no spam ou em Promoções. O remetente é {SENDER_EMAIL}. Se não achar, peça de novo e confira se o e-mail foi
               digitado certo.
             </Faq>
             <Faq q="Abri pelo ícone e ele pediu o e-mail de novo.">

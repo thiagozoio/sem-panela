@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
 import { ThemeToggle } from "./theme-toggle";
+import { BrandName } from "./brand-mark";
 
 export function AppShell({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
   return (
@@ -9,7 +10,7 @@ export function AppShell({ children, admin = false }: { children: ReactNode; adm
       <header className="bg-pitch-700 text-white">
         <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
           <Link href="/grupos" className="text-lg font-extrabold tracking-tight">
-            Sem Panela ⚽
+            <BrandName />
           </Link>
           <nav className="flex items-center gap-3 text-sm">
             <ThemeToggle />
