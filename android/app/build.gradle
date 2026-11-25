@@ -1,0 +1,51 @@
+plugins {
+    id "com.android.application"
+}
+
+// Versão do app na loja. A cada envio novo ao Google Play o versionCode precisa subir.
+// O workflow "App Android" usa o número da execução, então isso é automático.
+def appVersionCode = (System.getenv("VERSION_CODE") ?: "1").toInteger()
+def appVersionName = System.getenv("VERSION_NAME") ?: "1.0.${appVersionCode}"
+
+android {
+    namespace "br.com.coletinho"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "br.com.coletinho"
+        minSdk 23
+        targetSdk 36
+        versionCode appVersionCode
+        versionName appVersionName
+    }
+
+    signingConfigs {
+        upload {
+            def ks = System.getenv("KEYSTORE_FILE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias "upload"
+                keyPassword System.getenv("KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("KEYSTORE_FILE")) {
+                signingConfig signingConfigs.upload
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.5.0"
+}

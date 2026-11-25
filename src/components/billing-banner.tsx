@@ -68,7 +68,8 @@ export function BillingBanner({
   return (
     <div className={`space-y-1 rounded-2xl p-3 text-sm ring-1 ${tone}`}>
       <p className="font-semibold">{title}</p>
-      <p>
+      <p className="play-only">A assinatura não é feita pelo app Android.</p>
+      <p className="play-hide">
         {payHref ? (
           <Link className="font-semibold underline" href={payHref}>
             Pagar por Pix ou cartão

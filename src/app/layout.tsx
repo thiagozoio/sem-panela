@@ -3,6 +3,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { themeScript } from "@/lib/theme";
 import { installCaptureScript } from "@/lib/install";
+import { androidAppScript } from "@/lib/android-app";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 import { APP_NAME, DESCRIPTION, SITE_URL, SLOGAN } from "@/lib/brand";
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript + installCaptureScript }} />
+        <script dangerouslySetInnerHTML={{ __html: androidAppScript }} />
       </head>
       <body className="min-h-full flex flex-col">
         {children}

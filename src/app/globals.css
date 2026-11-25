@@ -90,3 +90,14 @@ body {
   background: var(--app-bg);
   color: var(--app-fg);
 }
+
+/* App Android da Google Play: esconde o pagamento da assinatura (ver src/lib/android-app.ts). */
+.play-only {
+  display: none;
+}
+:root[data-android-app] .play-hide {
+  display: none !important;
+}
+:root[data-android-app] .play-only {
+  display: revert;
+}
