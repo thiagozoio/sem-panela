@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Coletinho</string>
+    <string name="hostName">coletinho.com.br</string>
+    <string name="launch_url">https://coletinho.com.br/grupos?origem=android</string>
+    <string name="provider_authority">br.com.coletinho.fileprovider</string>
+    <string name="asset_statements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {\"namespace\": \"web\", \"site\": \"https://coletinho.com.br\"}
+        }]
+    </string>
+</resources>
