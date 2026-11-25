@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/auth";
-import { siteUrl } from "@/lib/site";
+import { requestOrigin, siteUrl } from "@/lib/site";
 
 export type LoginState = { step: "email" | "code" | "password"; email?: string; error?: string; next: string };
 
@@ -54,13 +54,16 @@ export async function signInWithPassword(prev: LoginState, formData: FormData): 
   redirect(next);
 }
 
-/** Entrar com Google (só aparece com NEXT_PUBLIC_GOOGLE_LOGIN=1). Volta pelo /auth/confirm. */
+/**
+ * Entrar com Google (só aparece com NEXT_PUBLIC_GOOGLE_LOGIN=1). Volta pelo /auth/confirm do
+ * mesmo endereço em que começou, porque o cookie de segurança do Google fica nele.
+ */
 export async function signInWithGoogle(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${await siteUrl()}/auth/confirm?next=${encodeURIComponent(next)}` },
+    options: { redirectTo: `${await requestOrigin()}/auth/confirm?next=${encodeURIComponent(next)}` },
   });
   if (error || !data.url) redirect(`/login?erro=1&next=${encodeURIComponent(next)}`);
   redirect(data.url);

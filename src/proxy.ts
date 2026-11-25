@@ -6,6 +6,16 @@ import { INVITE_COOKIE, INVITE_COOKIE_MAX_AGE, inviteCodeFromPath } from "@/lib/
 // Renova a sessão do Supabase a cada requisição. A checagem de acesso de verdade
 // fica nas páginas (requireUser) e no banco (RLS).
 export async function proxy(request: NextRequest) {
+  // Se o Supabase não reconhecer o endereço de volta do login com Google, ele manda para a
+  // página inicial com ?code=. Leva para o /auth/confirm, que termina o login.
+  const code = request.nextUrl.searchParams.get("code");
+  if (request.nextUrl.pathname === "/" && code) {
+    const confirm = new URL("/auth/confirm", request.nextUrl.origin);
+    confirm.searchParams.set("code", code);
+    confirm.searchParams.set("next", "/grupos");
+    return NextResponse.redirect(confirm);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
