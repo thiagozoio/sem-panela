@@ -12,7 +12,7 @@ import { guestTeams, teamsFromFixed, toDrawPlayer, withGuestTeams } from "@/lib/
 import { addToTeam, removeFromTeams } from "@/lib/guest-team";
 import { addMonths, monthOf, parseMoney } from "@/lib/format";
 import { ALL_POSITIONS, positionOf, sportOf } from "@/lib/sports";
-import { brazilDateTime } from "@/lib/matches";
+import { brazilDateTime, cleanOpponent, opponentOf, opponentTeams } from "@/lib/matches";
 import {
   decidedByOf,
   finalGameIds,
@@ -32,7 +32,7 @@ import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } fr
 import { formatOf, hasRounds, reachedLimit, roundGoalsOf, type Round } from "@/lib/rounds";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { undoErrorMessage } from "@/lib/history";
-import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
+import type { Attendance, FixedTeam, Game, GameGoal, Match, Member, MemberKind, Position } from "@/lib/types";
 
 // As permissões (só o organizador, grupo com assinatura em dia, o próprio jogador na presença)
 // são garantidas pela RLS do banco; as ações só carregam o grupo inteiro quando precisam dos dados.
@@ -289,6 +289,47 @@ async function fixedTeamsForGame(groupId: string, data: NonNullable<Awaited<Retu
   return teamsFromFixed(withGuestTeams(fixed, guestTeam), data.players, data.apart);
 }
 
+/**
+ * Jogo contra time de fora (formato "fora"): a turma confirmada contra o adversário do dia
+ * (o salvo no jogo ou o do amistoso marcado no mesmo dia). null se não for esse formato ou faltar o adversário.
+ */
+async function opponentTeamsForGame(
+  ctx: Awaited<ReturnType<typeof getGroupContext>>,
+  data: NonNullable<Awaited<ReturnType<typeof gameData>>>,
+) {
+  if (formatOf(ctx.group.game_format) !== "fora") return null;
+  const { data: matches } = await data.supabase
+    .from("matches")
+    .select("starts_at, opponent")
+    .eq("group_id", ctx.group.id)
+    .returns<Pick<Match, "starts_at" | "opponent">[]>();
+  const opponent = opponentOf(data.game, matches ?? []);
+  // Salva o adversário junto com os times: assim o jogo entra no histórico dos amistosos.
+  return opponent ? { teams: opponentTeams(ctx.group.name, opponent, data.players), opponent } : null;
+}
+
+/** Adversário do jogo (formato contra time de fora). Muda o nome do time de lá se o placar já tem times. */
+export async function setOpponent(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.isOrganizer || ctx.readOnly) return;
+  const opponent = cleanOpponent(str(fd, "opponent"));
+  const { data: game } = await ctx.supabase.from("games").select("*").eq("id", gameId).eq("group_id", groupId).single<Game>();
+  if (!game) return;
+  // Já tem placar com os dois times (nós x eles): só troca o nome do adversário.
+  const teams =
+    opponent && game.teams?.length === 2 && game.teams[1].players.length === 0
+      ? [game.teams[0], opponentTeams(ctx.group.name, opponent, [])[1]]
+      : undefined;
+  await ctx.supabase
+    .from("games")
+    .update({ opponent: opponent || null, ...(teams ? { teams } : {}) })
+    .eq("id", gameId)
+    .eq("group_id", groupId);
+  refresh();
+}
+
 /** Monta os times do jogo com os times fixos do mês. */
 export async function applyFixedTeams(fd: FormData) {
   const groupId = str(fd, "group_id");
@@ -325,7 +366,18 @@ export async function saveResult(fd: FormData) {
   // Jogo sem times salvos, mas com times fixos no mês: o placar é dos times fixos,
   // então eles passam a ser os times do jogo (sem avisar ninguém, o jogo já foi).
   let teamsUpdate = {};
-  if (scores.length && fd.get("use_fixed") === "1") {
+  if (scores.length === 2 && fd.get("use_opponent") === "1") {
+    const groupId = str(fd, "group_id");
+    const ctx = await getGroupContext(groupId);
+    if (!ctx.isOrganizer) return;
+    const data = await gameData(ctx, gameId);
+    if (!data) return;
+    if (!data.game.teams) {
+      const vs = await opponentTeamsForGame(ctx, data);
+      if (!vs) return;
+      teamsUpdate = vs;
+    }
+  } else if (scores.length && fd.get("use_fixed") === "1") {
     const groupId = str(fd, "group_id");
     const data = await confirmedForGame(groupId, gameId);
     if (!data) return;
@@ -473,12 +525,13 @@ async function liveAccess(groupId: string, gameId: string) {
   }
 
   let teams = game.teams;
-  let teamsUpdate: { teams?: NonNullable<Game["teams"]> } = {};
+  let teamsUpdate: { teams?: NonNullable<Game["teams"]>; opponent?: string } = {};
   if (!teams) {
-    const fixed = await fixedTeamsForGame(groupId, data);
+    const vs = await opponentTeamsForGame(ctx, data);
+    const fixed = vs?.teams ?? (await fixedTeamsForGame(groupId, data));
     if (fixed && fixed.length >= 2) {
       teams = fixed;
-      teamsUpdate = { teams };
+      teamsUpdate = vs ?? { teams };
     }
   }
 

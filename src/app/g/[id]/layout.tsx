@@ -1,3 +1,4 @@
+import { formatOf } from "@/lib/rounds";
 import { AppShell } from "@/components/app-shell";
 import { BillingBanner } from "@/components/billing-banner";
 import { GroupTabs } from "@/components/group-tabs";
@@ -26,7 +27,7 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
         groupId={group.id}
         organizer={isOrganizer}
         ranking={rankingOf(group.ranking) !== "off"}
-        matches={!!group.matches}
+        matches={!!group.matches || formatOf(group.game_format) === "fora"}
       />
       {children}
     </AppShell>

@@ -52,7 +52,7 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
         </Field>
         <Field
           label="Formato do jogo"
-          hint="Com várias partidas no dia (ex.: 3 times, jogos de 20 minutos), cada partida é anotada no Resultado e conta na classificação."
+          hint="Com várias partidas no dia (ex.: 3 times, jogos de 20 minutos), cada partida é anotada no Resultado e conta na classificação. Contra time de fora: quem confirmou joga contra o adversário do dia, com gols e tabela de cada um."
         >
           <Select name="game_format" defaultValue={formatOf(group.game_format)}>
             {GAME_FORMATS.map((f) => (
