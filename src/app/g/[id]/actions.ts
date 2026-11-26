@@ -27,7 +27,7 @@ import {
   type ResultGame,
 } from "@/lib/standings";
 import { siteUrl } from "@/lib/site";
-import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
+import { notifyCancel, notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } from "@/lib/live";
 import { formatOf, hasRounds, reachedLimit, roundGoalsOf, type Round } from "@/lib/rounds";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -215,6 +215,47 @@ export async function pushMessage(_prev: PushState, fd: FormData): Promise<PushS
   if (!ctx) return { error: "Só o organizador pode mandar avisos." };
   const sent = await notifyGroup(groupId, text, ctx.user.id);
   return sent ? { message: `Recado enviado para ${sent} celular${sent > 1 ? "es" : ""}.` } : { error: "Nenhum jogador está com os avisos ativados ainda." };
+}
+
+// ---------------------------------------------------------------------------
+// Cancelar o jogo
+// ---------------------------------------------------------------------------
+
+export type CancelState = { error?: string };
+
+/** Cancela o jogo (com motivo opcional) e avisa o grupo no celular. Dá para desfazer. */
+export async function cancelGame(_prev: CancelState, fd: FormData): Promise<CancelState> {
+  return setCanceled(fd, true);
+}
+
+/** Desfaz o cancelamento: a lista volta como estava. */
+export async function restoreGame(_prev: CancelState, fd: FormData): Promise<CancelState> {
+  return setCanceled(fd, false);
+}
+
+async function setCanceled(fd: FormData, canceled: boolean): Promise<CancelState> {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const ctx = await organizerOf(groupId);
+  if (!ctx) return { error: "Só o organizador pode cancelar o jogo." };
+  const reason = str(fd, "reason").slice(0, 120);
+  const { data, error } = await ctx.supabase
+    .from("games")
+    .update(canceled ? { canceled_at: new Date().toISOString(), cancel_reason: reason || null } : { canceled_at: null, cancel_reason: null })
+    .eq("id", gameId)
+    .eq("group_id", groupId)
+    .select("id");
+  if (error) {
+    return {
+      error: error.message.includes("canceled_at")
+        ? "Falta rodar a atualização do banco (cancelar jogo) no Supabase."
+        : "Não deu para salvar. Tente de novo.",
+    };
+  }
+  if (!data?.length) return { error: "Jogo não encontrado." };
+  if (fd.get("notify") === "1") after(() => notifyCancel(groupId, gameId, ctx.user.id, canceled));
+  refresh();
+  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,11 +1067,12 @@ export async function buildFinalTeams(fd: FormData) {
     supabase.from("championships").select("*").eq("group_id", groupId).returns<Championship[]>(),
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores, attendances(member_id, going)")
+      .select("*, attendances(member_id, going)")
       .eq("group_id", groupId)
       .not("scores", "is", null)
       .returns<ResultGame[]>(),
   ]);
+  const played = (games ?? []).filter((g) => !g.canceled_at);
   const champ = (list ?? []).find((c) => c.id === str(fd, "championship_id"));
   if (!champ?.final_game_id) return;
   const turns = turnsOf(champ, list ?? []);
@@ -1038,7 +1080,7 @@ export async function buildFinalTeams(fd: FormData) {
   const byId = new Map(members.map((m) => [m.id, m]));
   const nameOf = (id: string, fallback: string) => byId.get(id)?.name ?? fallback;
   const finals = finalGameIds(list ?? []);
-  const noGuests = withoutGuests(games ?? [], new Set(members.filter((m) => m.guest).map((m) => m.id)));
+  const noGuests = withoutGuests(played, new Set(members.filter((m) => m.guest).map((m) => m.id)));
   const [first, second] = turns.map((t) => standings(tableGames(noGuests, t, finals), nameOf).players);
   const ids = finalTeamIds(first, second, group.players_per_team);
   const sport = sportOf(group.sport);

@@ -68,7 +68,13 @@ export type Game = {
   scores: number[] | null;
   /** Adversário do dia (formato "contra time de fora"). Antes da migração 20261126000000 vem vazio. */
   opponent?: string | null;
+  /** Jogo cancelado pelo organizador. Antes da migração 20261127000000 vem vazio. */
+  canceled_at?: string | null;
+  cancel_reason?: string | null;
 };
+
+/** Jogo cancelado: fica fora da tabela, da presença e do financeiro. */
+export const isCanceled = (game: Pick<Game, "canceled_at">) => !!game.canceled_at;
 
 /** own_goals: gols contra (sem a migração 20261106120000 não vem do banco). */
 export type GameGoal = { game_id: string; member_id: string; goals: number; own_goals?: number };

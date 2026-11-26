@@ -98,3 +98,11 @@ export function debtorsMessage(
   lines.push("", "Valeu, galera! 🙏");
   return lines.join("\n");
 }
+
+/** Aviso de jogo cancelado para mandar no grupo do WhatsApp. */
+export function canceledMessage(groupName: string, startsAt: string, reason: string, link: string): string {
+  const lines = [`❌ *${groupName}*: jogo cancelado`, formatGameDate(startsAt)];
+  if (reason.trim()) lines.push("", `Motivo: ${reason.trim()}`);
+  lines.push("", "Semana que vem tem de novo. Fiquem de olho na lista:", link);
+  return lines.join("\n");
+}

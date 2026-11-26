@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Input, Select } from "@/components/ui";
+import { RestoreGameForm } from "../../cancel-game";
 import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
@@ -192,6 +193,24 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
             .sort((a, b) => Number(a.guest) - Number(b.guest) || a.name.localeCompare(b.name, "pt-BR")),
         ]
       : [];
+
+  if (game.canceled_at) {
+    return (
+      <div className="space-y-4">
+        <Link href={`/g/${group.id}/jogos`} className="text-sm text-pitch-700">
+          ‹ Jogos anteriores
+        </Link>
+        <Card className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Jogo cancelado</p>
+          <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
+          <p className="text-sm text-neutral-600">
+            {game.cancel_reason ? `Motivo: ${game.cancel_reason}. ` : ""}Não conta na tabela, na artilharia nem no financeiro.
+          </p>
+          {isOrganizer && !readOnly && <RestoreGameForm groupId={group.id} gameId={game.id} push={false} />}
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

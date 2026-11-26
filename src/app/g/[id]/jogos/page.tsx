@@ -35,7 +35,12 @@ export default async function PastGamesPage({ params }: PageProps<"/g/[id]/jogos
                 <Link href={`/g/${group.id}/jogos/${g.id}`} className="flex items-center justify-between gap-2 py-3 text-sm">
                   <span>{formatGameDate(g.starts_at)}</span>
                   <span className="text-neutral-500">
-                    {g.teams && g.scores?.length ? g.teams.map((t, i) => `${t.name} ${g.scores?.[i] ?? 0}`).join(" × ") : "ver"} ›
+                    {g.canceled_at
+                      ? "cancelado"
+                      : g.teams && g.scores?.length
+                        ? g.teams.map((t, i) => `${t.name} ${g.scores?.[i] ?? 0}`).join(" × ")
+                        : "ver"}{" "}
+                    ›
                   </span>
                 </Link>
               </li>

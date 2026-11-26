@@ -10,7 +10,7 @@ import {
 import { pushEnabled, sendPush } from "@/lib/push";
 import { subscriptionState } from "@/lib/subscription";
 import { createAdminClient, type AdminClient } from "@/lib/supabase/admin";
-import type { Attendance, Group, Member } from "@/lib/types";
+import { isCanceled, type Attendance, type Game, type Group, type Member } from "@/lib/types";
 
 // Rotina diária da Vercel (vercel.json, 10h de Brasília): lembrete de pelada hoje/amanhã para
 // quem não respondeu, mensalidade em aberto no dia 5 e aviso de assinatura vencendo ao organizador.
@@ -62,8 +62,9 @@ async function gameReminders(admin: AdminClient, group: Group, members: Member[]
   for (const { startsAt, when } of gamesToRemind(group, today)) {
     // Mesmo jogo que a tela abre (ensure_next_game): cria se ninguém abriu a lista ainda.
     await admin.from("games").upsert({ group_id: group.id, starts_at: startsAt }, { onConflict: "group_id,starts_at", ignoreDuplicates: true });
-    const { data: game } = await admin.from("games").select("id").eq("group_id", group.id).eq("starts_at", startsAt).maybeSingle();
-    if (!game) continue;
+    const { data: game } = await admin.from("games").select("*").eq("group_id", group.id).eq("starts_at", startsAt).maybeSingle<Game>();
+    // Jogo cancelado: ninguém precisa confirmar.
+    if (!game || isCanceled(game)) continue;
     const { data: attendances } = await admin.from("attendances").select("*").eq("game_id", game.id).returns<Attendance[]>();
     const rows = attendances ?? [];
     // Lista cheia no dia do jogo: não adianta chamar mais gente.

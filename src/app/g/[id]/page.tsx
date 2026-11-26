@@ -7,9 +7,9 @@ import { splitList, type ListEntry } from "@/lib/attendance";
 import { suggestedTeams } from "@/lib/draw";
 import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { guestTeams, withGuestTeams } from "@/lib/fixed-teams";
-import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
+import { canceledMessage, listMessage, teamNames, teamsMessage } from "@/lib/messages";
 import { byPosition, positionInfo, positionOptions, sportOf, type Sport } from "@/lib/sports";
-import type { Attendance, FixedTeam, Game, Match, Member } from "@/lib/types";
+import { isCanceled, type Attendance, type FixedTeam, type Game, type Match, type Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { PushToggle } from "@/components/push-toggle";
@@ -22,6 +22,7 @@ import { liveOpenForPlayers } from "@/lib/live";
 import { formatOf } from "@/lib/rounds";
 import { opponentOf } from "@/lib/matches";
 import { OpponentForm } from "./opponent-form";
+import { CancelGameForm, RestoreGameForm } from "./cancel-game";
 
 export default async function GamePage({ params, searchParams }: PageProps<"/g/[id]">) {
   const { id } = await params;
@@ -53,7 +54,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
     opponent = opponentOf(game, matches ?? []);
     knownOpponents = [...new Set((matches ?? []).map((m) => m.opponent.trim()))];
   }
-  const [{ data: fixedRows }, { data: lastGame }] = await Promise.all([
+  const [{ data: fixedRows }, { data: recentGames }] = await Promise.all([
     supabase
       .from("fixed_teams")
       .select("name, member_ids")
@@ -63,13 +64,15 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
       .returns<Pick<FixedTeam, "name" | "member_ids">[]>(),
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores")
+      .select("*")
       .eq("group_id", group.id)
       .lte("starts_at", new Date().toISOString())
       .order("starts_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<Pick<Game, "id" | "starts_at" | "teams" | "scores">>(),
+      .limit(5)
+      .returns<Game[]>(),
   ]);
+  // Último jogo que aconteceu (jogo cancelado não tem placar para ver).
+  const lastGame = (recentGames ?? []).find((g) => !isCanceled(g));
 
   const list = splitList(attendances ?? [], members, group.max_players, game.starts_at, group.priority_hours);
   const answered = new Set((attendances ?? []).map((a) => a.member_id));
@@ -104,6 +107,48 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
       <input type="hidden" name="member_id" value={memberId} />
     </>
   );
+
+  const lastGameCard = lastGame && (
+    <Link
+      href={`/g/${group.id}/jogos/${lastGame.id}`}
+      className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-4 text-sm shadow-sm ring-1 ring-black/5"
+    >
+      <span>
+        <span className="block text-xs font-semibold uppercase tracking-wide text-pitch-700">Último jogo</span>
+        {formatGameDate(lastGame.starts_at)}
+        {lastGame.teams && lastGame.scores?.length
+          ? ` · ${lastGame.teams.map((t, i) => `${t.name} ${lastGame.scores?.[i] ?? 0}`).join(" × ")}`
+          : ""}
+      </span>
+      <span className="whitespace-nowrap font-semibold text-pitch-700">Placar e craque ›</span>
+    </Link>
+  );
+
+  if (isCanceled(game)) {
+    return (
+      <div className="space-y-4">
+        <Card className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Jogo cancelado</p>
+            <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
+            {vsOutside && opponent && <p className="text-sm font-semibold text-pitch-900">x {opponent}</p>}
+          </div>
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-900">
+            ❌ Este jogo foi cancelado{game.cancel_reason ? `: ${game.cancel_reason.replace(/\.$/, "")}.` : "."} A lista
+            está fechada e o jogo não conta na tabela. A lista do próximo jogo abre depois do horário deste.
+          </p>
+          {isOrganizer && (
+            <ShareButtons
+              label="Avisar no WhatsApp"
+              text={canceledMessage(group.name, game.starts_at, game.cancel_reason ?? "", `${origin}/g/${group.id}`)}
+            />
+          )}
+          {isOrganizer && !readOnly && <RestoreGameForm groupId={group.id} gameId={game.id} push={push} />}
+        </Card>
+        {lastGameCard}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -171,21 +216,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
 
       {me && plays(me) && push && <PushToggle publicKey={VAPID_PUBLIC_KEY} variant="prompt" />}
 
-      {lastGame && (
-        <Link
-          href={`/g/${group.id}/jogos/${lastGame.id}`}
-          className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-4 text-sm shadow-sm ring-1 ring-black/5"
-        >
-          <span>
-            <span className="block text-xs font-semibold uppercase tracking-wide text-pitch-700">Último jogo</span>
-            {formatGameDate(lastGame.starts_at)}
-            {lastGame.teams && lastGame.scores?.length
-              ? ` · ${lastGame.teams.map((t, i) => `${t.name} ${lastGame.scores?.[i] ?? 0}`).join(" × ")}`
-              : ""}
-          </span>
-          <span className="whitespace-nowrap font-semibold text-pitch-700">Placar e craque ›</span>
-        </Link>
-      )}
+      {lastGameCard}
 
       <Card className="space-y-3">
         <h2 className="font-semibold">Confirmados</h2>
@@ -303,6 +334,8 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
       )}
 
       {isOrganizer && !readOnly && push && <OrganizerPush groupId={group.id} gameId={game.id} pending={pending.filter((m) => m.user_id).length} />}
+
+      {isOrganizer && !readOnly && <CancelGameForm groupId={group.id} gameId={game.id} push={push} />}
 
       {vsOutside ? (
         <Card className="space-y-3">

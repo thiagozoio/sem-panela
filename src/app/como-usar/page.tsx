@@ -285,6 +285,11 @@ export default async function HowToPage() {
               Tem gente que só responde no WhatsApp? Na aba Jogo, abra <strong>Marcar presença de outros jogadores</strong> e marque por eles.
               Embaixo aparece quem ainda não respondeu. <strong>Mandar lista no WhatsApp</strong> manda a lista pronta para o grupo.
             </p>
+            <p>
+              Choveu ou a quadra fechou? Na aba Jogo, abra <strong>❌ Cancelar este jogo</strong>, escreva o motivo se quiser e
+              avise a turma no celular e no WhatsApp. O jogo cancelado não conta na tabela nem cobra avulso. Voltou? Toque em{" "}
+              <strong>Desfazer cancelamento</strong>.
+            </p>
             <Shot src="org-presenca-outros" alt="Marcar presença de outros jogadores" />
           </Step>
           <Step n={5} title="Sorteie times equilibrados (ou use times fixos)">
