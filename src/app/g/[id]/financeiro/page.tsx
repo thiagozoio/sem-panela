@@ -10,7 +10,7 @@ import { getGroupContext } from "@/lib/groups";
 import { splitList } from "@/lib/attendance";
 import { addMonths, formatGameDate, formatMoney, isBillingMonth, monthLabel, monthParam, monthStart, todayInBrazil } from "@/lib/format";
 import { debtorsMessage } from "@/lib/messages";
-import type { Attendance, Expense, Game, Member, Payment } from "@/lib/types";
+import { isCanceled, type Attendance, type Expense, type Game, type Member, type Payment } from "@/lib/types";
 import { addExpense, copyExpenses, deleteExpense, setBillingStart, setCashStart, togglePayment } from "../actions";
 
 export const metadata: Metadata = { title: "Financeiro" };
@@ -73,7 +73,8 @@ export default async function FinancePage({ params, searchParams }: PageProps<"/
       payment: payments?.find((p) => p.member_id === m.id && p.kind === "mensal" && p.month === month),
     }));
 
-  const perGame = (charging ? (games ?? []) : []).map((game) => {
+  // Jogo cancelado não cobra avulso.
+  const perGame = (charging ? (games ?? []).filter((g) => !isCanceled(g)) : []).map((game) => {
     const { confirmed } = splitList(
       (attendances ?? []).filter((a) => a.game_id === game.id),
       members,

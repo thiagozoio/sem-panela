@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listMessage, teamNames } from "../messages";
+import { canceledMessage, listMessage, teamNames } from "../messages";
 import type { ListEntry } from "../attendance";
 import type { Member } from "../types";
 
@@ -50,5 +50,18 @@ describe("listMessage", () => {
     const msg = listMessage("Pelada", "2026-11-05T22:00:00Z", [...confirmed, guest], [], [], 10, "https://x/g/1", "society");
     expect(msg).toContain("4. Pedro (convidado)");
     expect(msg).not.toContain("Ana (convidado)");
+  });
+});
+
+describe("canceledMessage", () => {
+  it("avisa o cancelamento com motivo e link", () => {
+    const text = canceledMessage("Pelada", "2026-11-26T22:00:00Z", " chuva ", "https://coletinho.com.br/g/1");
+    expect(text).toContain("jogo cancelado");
+    expect(text).toContain("Motivo: chuva");
+    expect(text).toContain("https://coletinho.com.br/g/1");
+  });
+
+  it("sem motivo não escreve a linha do motivo", () => {
+    expect(canceledMessage("Pelada", "2026-11-26T22:00:00Z", "", "x")).not.toContain("Motivo");
   });
 });

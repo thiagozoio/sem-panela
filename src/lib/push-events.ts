@@ -77,3 +77,20 @@ export async function notifyGroup(groupId: string, text: string, actorUserId: st
   const userIds = (members ?? []).map((m) => m.user_id as string).filter((id) => id !== actorUserId);
   return sendPush(userIds, notify.broadcast(group.id, group.name, text), admin);
 }
+
+/** Jogo cancelado (ou que voltou): avisa todos os jogadores ativos, menos quem fez. */
+export async function notifyCancel(groupId: string, gameId: string, actorUserId: string, canceled: boolean) {
+  const data = await load(groupId, gameId);
+  if (!data) return;
+  const { group, game, members, admin } = data;
+  const userIds = members
+    .filter((m) => m.active && m.user_id && m.user_id !== actorUserId)
+    .map((m) => m.user_id!);
+  await sendPush(
+    userIds,
+    canceled
+      ? notify.gameCanceled(group.id, group.name, game.starts_at, game.cancel_reason ?? "")
+      : notify.gameRestored(group.id, group.name, game.starts_at),
+    admin,
+  );
+}

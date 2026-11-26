@@ -13,7 +13,8 @@ export async function loadRanking(groupId: string) {
   const [{ data: games }, { data: fixed }, { data: championships }, { data: rounds }] = await Promise.all([
     supabase
       .from("games")
-      .select("id, starts_at, teams, scores, game_goals(member_id, goals), attendances(member_id, going)")
+      // "*" e não a lista de colunas: antes da migração 20261127000000 não existe canceled_at.
+      .select("*, game_goals(member_id, goals), attendances(member_id, going)")
       .eq("group_id", group.id)
       .not("scores", "is", null)
       .lte("starts_at", new Date().toISOString())
@@ -33,7 +34,8 @@ export async function loadRanking(groupId: string) {
   ]);
   const roundsOf = new Map<string, RoundScore[]>();
   for (const r of rounds ?? []) roundsOf.set(r.game_id, [...(roundsOf.get(r.game_id) ?? []), r]);
-  const withRounds = (games ?? []).map((g) => (g.id && roundsOf.has(g.id) ? { ...g, rounds: roundsOf.get(g.id) } : g));
+  // Jogo cancelado não conta (nem se alguém chegou a pôr placar).
+  const withRounds = (games ?? []).filter((g) => !g.canceled_at).map((g) => (g.id && roundsOf.has(g.id) ? { ...g, rounds: roundsOf.get(g.id) } : g));
 
   const fixedByMonth = new Map<string, Set<string>>();
   for (const t of fixed ?? []) fixedByMonth.set(t.month, (fixedByMonth.get(t.month) ?? new Set()).add(t.name));

@@ -120,6 +120,25 @@ export const notify = {
     return { title: groupName, body, url: `${groupUrl(groupId)}/config`, tag: `assinatura-${groupId}` };
   },
 
+  gameCanceled(groupId: string, groupName: string, startsAt: string, reason: string): PushPayload {
+    const why = reason.trim() ? ` Motivo: ${reason.trim()}` : "";
+    return {
+      title: `${groupName}: jogo cancelado`,
+      body: `O jogo de ${formatGameDate(startsAt)} foi cancelado.${why}`,
+      url: groupUrl(groupId),
+      tag: `jogo-${groupId}`,
+    };
+  },
+
+  gameRestored(groupId: string, groupName: string, startsAt: string): PushPayload {
+    return {
+      title: groupName,
+      body: `Voltou! O jogo de ${formatGameDate(startsAt)} está de pé. Toque para ver a lista.`,
+      url: groupUrl(groupId),
+      tag: `jogo-${groupId}`,
+    };
+  },
+
   broadcast(groupId: string, groupName: string, text: string): PushPayload {
     return { title: groupName, body: text, url: groupUrl(groupId) };
   },

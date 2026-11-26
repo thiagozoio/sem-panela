@@ -57,14 +57,14 @@ export default async function MatchesPage({ params, searchParams }: PageProps<"/
     vsOutside
       ? supabase
           .from("games")
-          .select("id, group_id, starts_at, scores, opponent")
+          .select("*")
           .eq("group_id", group.id)
           .not("opponent", "is", null)
           .lte("starts_at", new Date().toISOString())
-          .returns<Pick<Game, "id" | "group_id" | "starts_at" | "scores" | "opponent">[]>()
-      : Promise.resolve({ data: [] as Pick<Game, "id" | "group_id" | "starts_at" | "scores" | "opponent">[] }),
+          .returns<Game[]>()
+      : Promise.resolve({ data: [] as Game[] }),
   ]);
-  const { upcoming, past } = splitMatches(mergeGameMatches(data ?? [], games ?? []));
+  const { upcoming, past } = splitMatches(mergeGameMatches(data ?? [], (games ?? []).filter((g) => !g.canceled_at)));
   const opponent = typeof adversario === "string" ? adversario : "";
   const sameOpponent = (m: Match) => m.opponent.trim().toLocaleLowerCase("pt-BR") === opponent.toLocaleLowerCase("pt-BR");
   const history = opponent ? past.filter(sameOpponent) : past;

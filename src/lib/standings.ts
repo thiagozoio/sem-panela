@@ -41,7 +41,7 @@ export type Championship = {
   champion_ids?: string[];
 };
 
-export type ResultGame = Pick<Game, "starts_at" | "teams" | "scores"> & {
+export type ResultGame = Pick<Game, "starts_at" | "teams" | "scores" | "canceled_at"> & {
   id?: string;
   game_goals?: Pick<GameGoal, "member_id" | "goals">[];
   /** Presenças do jogo: quem está com "não vai" / "não jogou" não conta nos times. */

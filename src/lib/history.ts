@@ -120,6 +120,9 @@ export function describeEntry(e: ChangeEntry, names: HistoryNames): string | nul
         const sc = e.new_row?.scores;
         parts.push(Array.isArray(sc) && sc.length ? `Placar do jogo${day}: ${sc.join(" x ")}` : `Apagou o placar do jogo${day}`);
       }
+      if (cols.includes("canceled_at")) {
+        parts.push(e.new_row?.canceled_at ? `Cancelou o jogo${day}` : `Desfez o cancelamento do jogo${day}`);
+      }
       if (cols.includes("teams")) {
         parts.push(e.new_row?.teams ? `Mudou os times do jogo${day}` : `Desfez os times do jogo${day}`);
       }
