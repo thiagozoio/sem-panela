@@ -29,6 +29,7 @@ import {
 import { siteUrl } from "@/lib/site";
 import { notifyGroup, notifyPending, notifyPromotions, notifyTeamsDrawn } from "@/lib/push-events";
 import { applyLiveGoal, liveOpenForPlayers, type LiveState, type LiveTarget } from "@/lib/live";
+import { formatOf, hasRounds, reachedLimit, roundGoalsOf, type Round } from "@/lib/rounds";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { undoErrorMessage } from "@/lib/history";
 import type { Attendance, FixedTeam, Game, GameGoal, Member, MemberKind, Position } from "@/lib/types";
@@ -335,11 +336,14 @@ export async function saveResult(fd: FormData) {
     }
   }
 
-  const { error } = await supabase
-    .from("games")
-    .update({ scores: scores.length ? scores : null, ...teamsUpdate })
-    .eq("id", gameId);
-  if (error) return;
+  // Várias partidas no dia: o placar geral vem das partidas, aqui só os gols de cada um.
+  if (fd.get("keep_scores") !== "1") {
+    const { error } = await supabase
+      .from("games")
+      .update({ scores: scores.length ? scores : null, ...teamsUpdate })
+      .eq("id", gameId);
+    if (error) return;
+  }
   // Gols contra (marcados ao vivo) continuam como estavam.
   const { data: oldRows } = await supabase.from("game_goals").select("*").eq("game_id", gameId).returns<GameGoal[]>();
   const ownOf = new Map((oldRows ?? []).filter((g) => (g.own_goals ?? 0) > 0).map((g) => [g.member_id, g.own_goals ?? 0]));
@@ -374,32 +378,10 @@ export async function liveGoal(input: {
 }): Promise<LiveState | null> {
   const { groupId, gameId } = input;
   const delta = input.delta === -1 ? -1 : 1;
-  const ctx = await getGroupContext(groupId);
-  if (!ctx.me || ctx.readOnly) return null;
-  const data = await gameData(ctx, gameId);
-  if (!data || data.game.group_id !== groupId) return null;
+  const live = await liveAccess(groupId, gameId);
+  if (!live) return null;
+  const { supabase, data, teams, teamsUpdate, rounds, roundGoals } = live;
   const { game } = data;
-  if (new Date(game.starts_at).getTime() > Date.now()) return null;
-  // A RLS só deixa o organizador gravar gols e placar. Para o jogador, durante o jogo, o
-  // servidor confere tudo aqui (é do grupo, grupo em dia, jogo do grupo rolando) e grava
-  // com a chave secreta, só neste jogo e só nos gols e no placar.
-  let supabase: Pick<typeof ctx.supabase, "from"> = ctx.supabase;
-  if (!ctx.isOrganizer) {
-    if (!liveOpenForPlayers(game.starts_at)) return null;
-    const admin = createAdminClient();
-    if (!admin) return null;
-    supabase = admin;
-  }
-
-  let teams = game.teams;
-  let teamsUpdate = {};
-  if (!teams) {
-    const fixed = await fixedTeamsForGame(groupId, data);
-    if (fixed && fixed.length >= 2) {
-      teams = fixed;
-      teamsUpdate = { teams };
-    }
-  }
 
   const { data: goalRows } = await supabase.from("game_goals").select("*").eq("game_id", gameId).returns<GameGoal[]>();
   const rows = goalRows ?? [];
@@ -407,6 +389,7 @@ export async function liveGoal(input: {
     scores: game.scores,
     goals: Object.fromEntries(rows.filter((g) => g.goals > 0).map((g) => [g.member_id, g.goals])),
     ownGoals: Object.fromEntries(rows.filter((g) => (g.own_goals ?? 0) > 0).map((g) => [g.member_id, g.own_goals ?? 0])),
+    ...(rounds ? { round: rounds.at(-1) ?? null } : {}),
   };
   // Só quem está nos times (ou, sem times, na lista de confirmados) ou já tem gol na linha.
   const known = (id: string) =>
@@ -429,7 +412,7 @@ export async function liveGoal(input: {
     target = { team };
   }
   if (memberId && !known(memberId)) return null;
-  const next = applyLiveGoal(before, teams, delta, target);
+  const next = applyLiveGoal(before, teams, delta, target, roundGoals);
   if (next === before) return before;
 
   if (memberId) {
@@ -455,8 +438,151 @@ export async function liveGoal(input: {
       .eq("group_id", groupId);
     if (error) return null;
   }
+  if (next.round && next.round !== before.round) {
+    const r = next.round;
+    const { error } = await supabase
+      .from("game_rounds")
+      .update({ home_score: r.home_score, away_score: r.away_score, goals: r.goals, own_goals: r.own_goals, finished: r.finished })
+      .eq("id", r.id)
+      .eq("game_id", gameId);
+    if (error) return null;
+  }
   return next;
 }
+
+/**
+ * Quem pode mexer no placar ao vivo deste jogo e com qual chave: o organizador sempre
+ * (pela RLS); qualquer jogador do grupo só durante o jogo. A RLS só deixa o organizador
+ * gravar gols, placar e partidas: para o jogador, o servidor confere tudo aqui (é do grupo,
+ * grupo em dia, jogo do grupo rolando) e grava com a chave secreta, só neste jogo.
+ * Também traz os times do placar (os do jogo ou os fixos do mês) e as partidas do dia.
+ */
+async function liveAccess(groupId: string, gameId: string) {
+  const ctx = await getGroupContext(groupId);
+  if (!ctx.me || ctx.readOnly) return null;
+  const data = await gameData(ctx, gameId);
+  if (!data || data.game.group_id !== groupId) return null;
+  const { game } = data;
+  if (new Date(game.starts_at).getTime() > Date.now()) return null;
+  let supabase: Pick<typeof ctx.supabase, "from"> = ctx.supabase;
+  if (!ctx.isOrganizer) {
+    if (!liveOpenForPlayers(game.starts_at)) return null;
+    const admin = createAdminClient();
+    if (!admin) return null;
+    supabase = admin;
+  }
+
+  let teams = game.teams;
+  let teamsUpdate: { teams?: NonNullable<Game["teams"]> } = {};
+  if (!teams) {
+    const fixed = await fixedTeamsForGame(groupId, data);
+    if (fixed && fixed.length >= 2) {
+      teams = fixed;
+      teamsUpdate = { teams };
+    }
+  }
+
+  // Formato com várias partidas: sem a migração 20261126000000 a tabela não existe e vale o jogo único.
+  let rounds: Round[] | null = null;
+  if (hasRounds(formatOf(ctx.group.game_format)) && teams) {
+    const { data: list, error } = await supabase
+      .from("game_rounds")
+      .select("*")
+      .eq("game_id", gameId)
+      .order("seq")
+      .returns<Round[]>();
+    if (!error) rounds = list ?? [];
+  }
+  return { ctx, supabase, data, teams, teamsUpdate, rounds, roundGoals: roundGoalsOf(ctx.group.round_goals) };
+}
+
+/**
+ * Começa a próxima partida do dia entre os times `home` e `away` (posições nos times do jogo).
+ * A que estava rolando acaba. Organizador sempre; jogadores durante o jogo, como nos gols.
+ */
+export async function startRound(input: { groupId: string; gameId: string; home: number; away: number }): Promise<boolean> {
+  const live = await liveAccess(input.groupId, input.gameId);
+  if (!live?.rounds || !live.teams) return false;
+  const { supabase, teams, teamsUpdate, rounds } = live;
+  const home = Number(input.home);
+  const away = Number(input.away);
+  const valid = (i: number) => Number.isInteger(i) && i >= 0 && i < teams.length;
+  if (!valid(home) || !valid(away) || home === away) return false;
+  // Placar geral zerado já na primeira partida, para o jogo entrar na classificação mesmo com 0 x 0.
+  const scoresUpdate = live.data.game.scores?.length === teams.length ? {} : { scores: teams.map(() => 0) };
+  if ("teams" in teamsUpdate || "scores" in scoresUpdate) {
+    const { error } = await supabase
+      .from("games")
+      .update({ ...teamsUpdate, ...scoresUpdate })
+      .eq("id", input.gameId)
+      .eq("group_id", input.groupId);
+    if (error) return false;
+  }
+  const open = rounds.filter((r) => !r.finished);
+  if (open.length) {
+    const { error } = await supabase
+      .from("game_rounds")
+      .update({ finished: true })
+      .in("id", open.map((r) => r.id));
+    if (error) return false;
+  }
+  const seq = (rounds.at(-1)?.seq ?? 0) + 1;
+  const { error } = await supabase
+    .from("game_rounds")
+    .insert({ game_id: input.gameId, group_id: input.groupId, seq, home, away });
+  refresh();
+  return !error;
+}
+
+/** Encerra a partida (acabou o tempo) ou reabre a última (encerrou sem querer). */
+export async function setRoundFinished(input: { groupId: string; gameId: string; roundId: string; finished: boolean }): Promise<boolean> {
+  const live = await liveAccess(input.groupId, input.gameId);
+  if (!live?.rounds) return false;
+  const last = live.rounds.at(-1);
+  const round = live.rounds.find((r) => r.id === input.roundId);
+  if (!round) return false;
+  // Reabrir só a última, e não se já chegou ao limite de gols (ela fecharia de novo).
+  if (!input.finished && (round !== last || reachedLimit(round, live.roundGoals))) return false;
+  const { error } = await live.supabase
+    .from("game_rounds")
+    .update({ finished: !!input.finished })
+    .eq("id", round.id)
+    .eq("game_id", input.gameId);
+  refresh();
+  return !error;
+}
+
+/**
+ * Só o organizador: apaga uma partida do dia. Os gols dela saem do placar geral e da artilharia.
+ */
+export async function deleteRound(fd: FormData) {
+  const groupId = str(fd, "group_id");
+  const gameId = str(fd, "game_id");
+  const live = await liveAccess(groupId, gameId);
+  if (!live?.rounds || !live.ctx.isOrganizer) return;
+  const { supabase, data, rounds } = live;
+  const round = rounds.find((r) => r.id === str(fd, "round_id"));
+  if (!round) return;
+  const { error } = await supabase.from("game_rounds").delete().eq("id", round.id).eq("game_id", gameId);
+  if (error) return;
+  const game = data.game;
+  if (game.teams && game.scores) {
+    const scores = game.teams.map((_, i) => game.scores?.[i] ?? 0);
+    scores[round.home] = Math.max(0, (scores[round.home] ?? 0) - round.home_score);
+    scores[round.away] = Math.max(0, (scores[round.away] ?? 0) - round.away_score);
+    await supabase.from("games").update({ scores }).eq("id", gameId).eq("group_id", groupId);
+  }
+  const { data: goalRows } = await supabase.from("game_goals").select("*").eq("game_id", gameId).returns<GameGoal[]>();
+  for (const g of goalRows ?? []) {
+    const goals = Math.max(0, g.goals - (round.goals?.[g.member_id] ?? 0));
+    const own = Math.max(0, (g.own_goals ?? 0) - (round.own_goals?.[g.member_id] ?? 0));
+    if (goals === g.goals && own === (g.own_goals ?? 0)) continue;
+    if (!goals && !own) await supabase.from("game_goals").delete().eq("game_id", gameId).eq("member_id", g.member_id);
+    else await supabase.from("game_goals").update({ goals, ...(g.own_goals != null ? { own_goals: own } : {}) }).eq("game_id", gameId).eq("member_id", g.member_id);
+  }
+  refresh();
+}
+
 
 /**
  * Depois do jogo o organizador corrige quem jogou: campos "who_<member_id>" com
@@ -797,6 +923,14 @@ export async function saveChampionship(_prev: ChampionshipState, fd: FormData): 
     const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
     if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
   }
+  if (fd.has("game_format")) {
+    // À parte: sem a migração 20261126000000 as colunas não existem e o resto já foi salvo.
+    const { error: formatError } = await supabase
+      .from("groups")
+      .update({ game_format: formatOf(str(fd, "game_format")), round_goals: roundGoalsOf(str(fd, "round_goals")) })
+      .eq("id", groupId);
+    if (formatError) return { error: "Salvo, menos o formato do jogo: falta rodar a atualização do banco." };
+  }
   refresh();
   return { ok: true };
 }
@@ -904,6 +1038,14 @@ export async function saveMatch(_prev: MatchState, fd: FormData): Promise<MatchS
     // À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo.
     const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
     if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
+  }
+  if (fd.has("game_format")) {
+    // À parte: sem a migração 20261126000000 as colunas não existem e o resto já foi salvo.
+    const { error: formatError } = await supabase
+      .from("groups")
+      .update({ game_format: formatOf(str(fd, "game_format")), round_goals: roundGoalsOf(str(fd, "round_goals")) })
+      .eq("id", groupId);
+    if (formatError) return { error: "Salvo, menos o formato do jogo: falta rodar a atualização do banco." };
   }
   refresh();
   return { ok: true };
@@ -1056,6 +1198,14 @@ export async function saveSettings(_prev: SettingsState, fd: FormData): Promise<
     // À parte: sem a migração 20261031000000 a coluna não existe e o resto já foi salvo.
     const { error: billingError } = await supabase.from("groups").update({ billing_start: billingStart || null }).eq("id", groupId);
     if (billingError) return { error: "Salvo, menos o início da cobrança: falta rodar a atualização do banco." };
+  }
+  if (fd.has("game_format")) {
+    // À parte: sem a migração 20261126000000 as colunas não existem e o resto já foi salvo.
+    const { error: formatError } = await supabase
+      .from("groups")
+      .update({ game_format: formatOf(str(fd, "game_format")), round_goals: roundGoalsOf(str(fd, "round_goals")) })
+      .eq("id", groupId);
+    if (formatError) return { error: "Salvo, menos o formato do jogo: falta rodar a atualização do banco." };
   }
   refresh();
   return { ok: true };

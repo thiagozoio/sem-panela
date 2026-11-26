@@ -56,9 +56,13 @@ export function resultMessage(
   goalList: { name: string; goals: number }[],
   best: string | null,
   ownGoalList: { name: string; goals: number }[] = [],
+  /** Várias partidas no dia: uma linha por partida ("1. Azul 2 x 1 Vermelho"). */
+  roundList?: string[],
 ): string {
   const lines = [`⚽ *${groupName}*: resultado`, formatGameDate(startsAt)];
-  if (teams && scores?.length) {
+  if (roundList?.length) {
+    lines.push("", "*Partidas*", ...roundList);
+  } else if (teams && scores?.length) {
     lines.push("", ...teams.map((t, i) => `*${t.name}* ${scores[i] ?? 0}`));
   }
   if (goalList.length || ownGoalList.length) {

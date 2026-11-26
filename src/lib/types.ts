@@ -29,6 +29,10 @@ export type Group = {
   matches?: boolean;
   /** Mês (AAAA-MM-01) em que a cobrança pelo app começa; vazio = desde sempre. Antes da migração 20261031000000 vem vazio. */
   billing_start?: string | null;
+  /** Formato do jogo no dia (ver src/lib/rounds.ts). Antes da migração 20261126000000 vem vazio (jogo único). */
+  game_format?: string;
+  /** Gols para acabar uma partida do dia; vazio = sem limite. */
+  round_goals?: number | null;
   created_at: string;
 };
 
