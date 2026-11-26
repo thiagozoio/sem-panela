@@ -210,7 +210,7 @@ export function LiveGoals({
             <h3 className="text-sm font-semibold text-pitch-900">{t.name}</h3>
             <ul className="divide-y divide-neutral-100">{roster.map(row)}</ul>
             <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-500">
-              <span>Gol sem autor</span>
+              <span>{t.players.length ? "Gol sem autor" : `Gol do ${t.name}`}</span>
               <button
                 type="button"
                 onClick={() => tap(-1, { team: i })}

@@ -12,8 +12,10 @@ import { positionInfo, positionRank, sportOf } from "@/lib/sports";
 import { outcomes } from "@/lib/standings";
 import { teamColors } from "@/lib/team-colors";
 import { MVP_VOTE_HOURS, bestPlayer, mvpVoteOpen, mvpWinners, ownGoalLabel, ownGoalScorers, rankMvpVotes, rankRatings, resultMessage, scorers } from "@/lib/result";
-import type { Attendance, FixedTeam, Game, GameGoal, Member, MvpSummary, RatingSummary } from "@/lib/types";
+import type { Attendance, FixedTeam, Game, GameGoal, Match, Member, MvpSummary, RatingSummary } from "@/lib/types";
 import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions";
+import { opponentOf, opponentTeams } from "@/lib/matches";
+import { OpponentForm } from "../../opponent-form";
 import { liveOpenForPlayers } from "@/lib/live";
 import { LiveGoals } from "./live-goals";
 import { Scoreboard, TeamRosters, type BoardTeam } from "./scoreboard";
@@ -135,7 +137,27 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   // Jogo sem times salvos (não teve sorteio): se o mês tem times fixos, o placar
   // é anotado com eles, e ao salvar eles viram os times do jogo.
   let fixedTeams: Game["teams"] = null;
-  if (canMarkLive && started && !game.teams) {
+  // Contra time de fora: o adversário do jogo (ou do amistoso do mesmo dia) e as sugestões de nomes.
+  const vsOutside = format === "fora";
+  let opponent = "";
+  let knownOpponents: string[] = [];
+  if (vsOutside) {
+    const { data: matches } = await supabase
+      .from("matches")
+      .select("starts_at, opponent")
+      .eq("group_id", group.id)
+      .returns<Pick<Match, "starts_at" | "opponent">[]>();
+    opponent = opponentOf(game, matches ?? []);
+    knownOpponents = [...new Set((matches ?? []).map((m) => m.opponent.trim()))];
+  }
+  const usesOpponent = vsOutside && !!opponent && !game.teams && canMarkLive && started;
+  if (usesOpponent) {
+    fixedTeams = opponentTeams(
+      group.name,
+      opponent,
+      played.map((m) => ({ member_id: m.id, name: m.name, position: m.position })),
+    );
+  } else if (canMarkLive && started && !game.teams) {
     const { data: fixed } = await supabase
       .from("fixed_teams")
       .select("name, member_ids")
@@ -259,6 +281,12 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         )}
       </Card>
 
+      {vsOutside && canEditResult && (
+        <Card>
+          <OpponentForm groupId={group.id} gameId={game.id} opponent={opponent} suggestions={knownOpponents} />
+        </Card>
+      )}
+
       {canMarkLive && started && (
         <Card>
           <details open={live} id="ao-vivo">
@@ -370,7 +398,7 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
             >
               <input type="hidden" name="game_id" value={game.id} />
               <input type="hidden" name="group_id" value={group.id} />
-              {!game.teams && fixedTeams && <input type="hidden" name="use_fixed" value="1" />}
+              {!game.teams && fixedTeams && <input type="hidden" name={usesOpponent ? "use_opponent" : "use_fixed"} value="1" />}
               {rounds && roundTeams && <input type="hidden" name="keep_scores" value="1" />}
               {!scoreTeams && (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">

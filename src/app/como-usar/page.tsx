@@ -22,6 +22,7 @@ const sections = [
   ["entrar", "Entrar"],
   ["jogador", "⚽ Jogador"],
   ["organizador", "📋 Organizador"],
+  ["formatos", "🔁 Formatos"],
   ["financeiro", "💰 Financeiro"],
   ["tabela", "🏆 Tabela"],
   ["assinatura", "Assinatura"],
@@ -311,6 +312,71 @@ export default async function HowToPage() {
               <Shot src="org-placar" alt="Anotar placar e gols" caption="Anotar placar" />
               <Shot src="org-resultado" alt="Resultado do jogo" caption="Resultado" />
             </Shots>
+          </Step>
+        </Section>
+
+        <Section id="formatos" kicker="Organizador" title="Cada pelada do seu jeito">
+          <Step n={1} title="Escolha o formato do jogo">
+            <p>
+              Em <strong>Ajustes › Formato do jogo</strong>, escolha como a sua turma joga:
+            </p>
+            <List>
+              <li>
+                <strong>Jogo único:</strong> um placar só no dia, com times sorteados ou fixos do mês (o padrão).
+              </li>
+              <li>
+                <strong>Várias partidas, todos contra todos:</strong> por exemplo, 3 times e 3 jogos de 20 minutos (A x B, o vencedor pega o C,
+                depois o C pega o perdedor).
+              </li>
+              <li>
+                <strong>Várias partidas, quem ganha fica:</strong> joguinhos curtos em que o vencedor continua e entra quem está esperando.
+              </li>
+              <li>
+                <strong>Sempre contra um time de fora:</strong> a turma toda joga contra um adversário diferente.
+              </li>
+            </List>
+            <p>
+              Nos formatos com várias partidas, dá para escolher em <strong>Cada partida acaba com</strong> um número de gols (por exemplo,
+              2): quando um time chega lá, a partida fecha sozinha.
+            </p>
+          </Step>
+          <Step n={2} title="Várias partidas no mesmo dia">
+            <List>
+              <li>Sorteie os times (ou use os times fixos do mês) como sempre.</li>
+              <li>
+                No dia, abra <strong>⚽ Jogo rolando: marcar gols ao vivo</strong> e toque em <strong>Começar partida</strong>. O app já
+                sugere quem joga; dá para trocar.
+              </li>
+              <li>
+                Marque os gols com o <strong>+1 gol</strong> de cada jogador. Acabou o tempo? <strong>Encerrar partida</strong> e comece a
+                próxima.
+              </li>
+              <li>
+                O resultado mostra a <strong>tabela do dia</strong> e todas as partidas. Na classificação, cada partida conta como um jogo.
+              </li>
+            </List>
+          </Step>
+          <Step n={3} title="Jogos contra outros times">
+            <List>
+              <li>
+                Na aba <strong>Amistosos</strong>, toque em <strong>+ Marcar amistoso</strong> e preencha o nome do adversário, data,
+                horário, local e o contato de quem marcou com você (nome e WhatsApp). Dá para marcar vários jogos para a frente: eles ficam
+                em <strong>Próximos jogos</strong>, com o botão para chamar o contato no WhatsApp e o <strong>Avisar a turma</strong>.
+              </li>
+              <li>
+                Com o formato <strong>Sempre contra um time de fora</strong>, o jogo da semana já aparece como &quot;x adversário&quot; no
+                dia do amistoso. Se não marcou na aba Amistosos, escreva o nome em <strong>Adversário</strong>, na aba Jogo.
+              </li>
+              <li>
+                Todo mundo confirma presença como sempre. Durante o jogo, marque os gols da turma e use o <strong>+1</strong> que aparece
+                embaixo do nome do adversário para os gols de lá.
+              </li>
+              <li>
+                Em <strong>Amistosos</strong> fica o histórico contra cada time, com placar e link para os gols. Na aba{" "}
+                <strong>Tabela</strong>, cada jogador tem jogos, vitórias, derrotas e gols. Para ver o ano inteiro, ligue{" "}
+                <strong>Ajustes › Classificação › Campeonato com datas</strong> e crie a temporada (1º turno, 2º turno e anual).
+              </li>
+            </List>
           </Step>
         </Section>
 

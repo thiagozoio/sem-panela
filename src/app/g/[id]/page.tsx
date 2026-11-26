@@ -9,7 +9,7 @@ import { formatGameDate, hasStarted, monthOf } from "@/lib/format";
 import { guestTeams, withGuestTeams } from "@/lib/fixed-teams";
 import { listMessage, teamNames, teamsMessage } from "@/lib/messages";
 import { byPosition, positionInfo, positionOptions, sportOf, type Sport } from "@/lib/sports";
-import type { Attendance, FixedTeam, Game, Member } from "@/lib/types";
+import type { Attendance, FixedTeam, Game, Match, Member } from "@/lib/types";
 import { siteUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { PushToggle } from "@/components/push-toggle";
@@ -19,6 +19,9 @@ import { GuestForm } from "./guest-form";
 import { applyFixedTeams, clearAttendance, clearTeams, drawTeamsAction, removeGuest, setAttendance } from "./actions";
 import { plays, regularPlayer } from "@/lib/members";
 import { liveOpenForPlayers } from "@/lib/live";
+import { formatOf } from "@/lib/rounds";
+import { opponentOf } from "@/lib/matches";
+import { OpponentForm } from "./opponent-form";
 
 export default async function GamePage({ params, searchParams }: PageProps<"/g/[id]">) {
   const { id } = await params;
@@ -37,6 +40,19 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
   if (!gameRow) return <Card>Não deu para abrir a lista. Recarregue a página.</Card>;
   const { attendances, ...game } = gameRow;
   const sport = sportOf(group.sport);
+  // Contra time de fora: sem sorteio, o jogo é a turma contra o adversário do dia.
+  const vsOutside = formatOf(group.game_format) === "fora";
+  let opponent = "";
+  let knownOpponents: string[] = [];
+  if (vsOutside) {
+    const { data: matches } = await supabase
+      .from("matches")
+      .select("starts_at, opponent")
+      .eq("group_id", group.id)
+      .returns<Pick<Match, "starts_at" | "opponent">[]>();
+    opponent = opponentOf(game, matches ?? []);
+    knownOpponents = [...new Set((matches ?? []).map((m) => m.opponent.trim()))];
+  }
   const [{ data: fixedRows }, { data: lastGame }] = await Promise.all([
     supabase
       .from("fixed_teams")
@@ -101,6 +117,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-pitch-700">Próximo jogo</p>
             <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
+            {vsOutside && opponent && <p className="text-sm font-semibold text-pitch-900">x {opponent}</p>}
           </div>
           <Badge tone={list.confirmed.length >= group.max_players ? "amber" : "green"}>
             {list.confirmed.length}/{group.max_players}
@@ -287,6 +304,19 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
 
       {isOrganizer && !readOnly && push && <OrganizerPush groupId={group.id} gameId={game.id} pending={pending.filter((m) => m.user_id).length} />}
 
+      {vsOutside ? (
+        <Card className="space-y-3">
+          <h2 className="font-semibold">Adversário</h2>
+          <p className="text-sm text-neutral-600">
+            {opponent
+              ? `Jogo contra ${opponent}. Quem confirmou joga pela ${group.name}; depois é só marcar os gols no Resultado.`
+              : isOrganizer
+                ? "Escreva contra quem é o jogo. Se marcou o amistoso na aba Amistosos para o mesmo dia, ele aparece aqui sozinho."
+                : "O organizador ainda não disse contra quem é o jogo."}
+          </p>
+          {isOrganizer && !readOnly && <OpponentForm groupId={group.id} gameId={game.id} opponent={opponent} suggestions={knownOpponents} />}
+        </Card>
+      ) : (
       <Card className="space-y-3">
         <h2 className="font-semibold">Times</h2>
         {game.teams ? (
@@ -356,6 +386,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/g/[
           </form>
         )}
       </Card>
+      )}
     </div>
   );
 }

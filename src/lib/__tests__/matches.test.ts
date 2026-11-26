@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brazilDateTime, formatPhone, matchRecord, phoneDigits, splitMatches, toBrazilInputs, whatsappTo } from "../matches";
+import { brazilDateTime, formatPhone, matchRecord, phoneDigits, splitMatches, toBrazilInputs, whatsappTo, mergeGameMatches, opponentOf, opponentTeams } from "../matches";
 import type { Match } from "../types";
 
 const match = (id: string, starts_at: string, opponent: string, our: number | null = null, their: number | null = null): Match => ({
@@ -55,5 +55,31 @@ describe("amistosos", () => {
     ]);
     expect(total).toMatchObject({ games: 3, wins: 1, draws: 1, losses: 1, scored: 5, conceded: 4 });
     expect(opponents.map((o) => [o.opponent, o.games])).toEqual([["Amigos FC", 2], ["Vila", 1]]);
+  });
+});
+
+describe("jogo contra time de fora", () => {
+  const base = { id: "m1", group_id: "g", location: "", contact_name: "", contact_phone: "", notes: "", created_at: "" };
+  it("monta nós x eles, sem jogadores do lado de lá", () => {
+    const t = opponentTeams("Pelada", "  Tigres   FC ", [{ member_id: "a", name: "A", position: "linha" }]);
+    expect(t.map((x) => x.name)).toEqual(["Pelada", "Tigres FC"]);
+    expect(t[1].players).toEqual([]);
+    expect(opponentTeams("Tigres", "tigres", [])[1].name).toBe("tigres (adv.)");
+  });
+  it("adversário salvo no jogo ou o do amistoso do mesmo dia", () => {
+    const matches = [{ starts_at: "2026-11-26T22:00:00Z", opponent: "Leões" }];
+    expect(opponentOf({ starts_at: "2026-11-26T23:00:00Z", opponent: null }, matches)).toBe("Leões");
+    expect(opponentOf({ starts_at: "2026-11-26T23:00:00Z", opponent: "Tigres" }, matches)).toBe("Tigres");
+    expect(opponentOf({ starts_at: "2026-11-27T23:00:00Z", opponent: null }, matches)).toBe("");
+  });
+  it("histórico junta os jogos e tira o amistoso repetido do mesmo dia", () => {
+    const matches = [
+      { ...base, starts_at: "2026-11-26T22:00:00Z", opponent: "Leões", our_score: null, their_score: null },
+      { ...base, id: "m2", starts_at: "2026-10-01T22:00:00Z", opponent: "Leões", our_score: 1, their_score: 0 },
+    ];
+    const games = [{ id: "j1", group_id: "g", starts_at: "2026-11-26T23:00:00Z", scores: [3, 2], opponent: "leões" }];
+    const all = mergeGameMatches(matches, games);
+    expect(all.map((m) => m.id).sort()).toEqual(["j1", "m2"]);
+    expect(all.find((m) => m.id === "j1")).toMatchObject({ our_score: 3, their_score: 2, game_id: "j1" });
   });
 });

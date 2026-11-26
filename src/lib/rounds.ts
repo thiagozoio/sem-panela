@@ -4,21 +4,23 @@ import { outcomes, type Outcome } from "./standings";
  * Como o grupo joga no dia:
  * - "unico": um placar só (como sempre foi);
  * - "todos": várias partidas curtas, todos contra todos (ex.: A x B, vencedor x C, C x perdedor);
- * - "fica": várias partidas curtas, quem ganha fica e quem perde sai.
+ * - "fica": várias partidas curtas, quem ganha fica e quem perde sai;
+ * - "fora": o jogo é sempre contra um time de fora (a turma toda contra o adversário do dia).
  */
-export type GameFormat = "unico" | "todos" | "fica";
+export type GameFormat = "unico" | "todos" | "fica" | "fora";
 
 export const GAME_FORMATS: { value: GameFormat; label: string }[] = [
   { value: "unico", label: "Jogo único (um placar só)" },
   { value: "todos", label: "Várias partidas, todos contra todos" },
   { value: "fica", label: "Várias partidas, quem ganha fica" },
+  { value: "fora", label: "Sempre contra um time de fora" },
 ];
 
 export function formatOf(value: string | null | undefined): GameFormat {
-  return value === "todos" || value === "fica" ? value : "unico";
+  return value === "todos" || value === "fica" || value === "fora" ? value : "unico";
 }
 
-export const hasRounds = (format: GameFormat) => format !== "unico";
+export const hasRounds = (format: GameFormat) => format === "todos" || format === "fica";
 
 /** Gols para acabar a partida (1 a 20) ou null (sem limite, acaba no tempo). */
 export function roundGoalsOf(value: unknown): number | null {

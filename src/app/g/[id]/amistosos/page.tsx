@@ -5,8 +5,9 @@ import { ShareButtons } from "@/components/share";
 import { SubmitButton } from "@/components/submit";
 import { getGroupContext } from "@/lib/groups";
 import { formatGameDate, hasStarted } from "@/lib/format";
-import { formatPhone, matchRecord, outcomeOf, splitMatches, whatsappTo, type MatchRecord } from "@/lib/matches";
-import type { Match } from "@/lib/types";
+import { formatPhone, matchRecord, mergeGameMatches, outcomeOf, splitMatches, whatsappTo, type MatchRecord } from "@/lib/matches";
+import { formatOf } from "@/lib/rounds";
+import type { Game, Match } from "@/lib/types";
 import { deleteMatch, saveMatchScore } from "../actions";
 import { MatchForm } from "./match-form";
 
@@ -36,7 +37,8 @@ export default async function MatchesPage({ params, searchParams }: PageProps<"/
   const canEdit = isOrganizer && !readOnly;
   const base = `/g/${group.id}/amistosos`;
 
-  if (!group.matches) {
+  const vsOutside = formatOf(group.game_format) === "fora";
+  if (!group.matches && !vsOutside) {
     return (
       <Card className="space-y-2">
         <h2 className="font-semibold">Amistosos</h2>
@@ -49,8 +51,20 @@ export default async function MatchesPage({ params, searchParams }: PageProps<"/
     );
   }
 
-  const { data } = await supabase.from("matches").select("*").eq("group_id", group.id).returns<Match[]>();
-  const { upcoming, past } = splitMatches(data ?? []);
+  const [{ data }, { data: games }] = await Promise.all([
+    supabase.from("matches").select("*").eq("group_id", group.id).returns<Match[]>(),
+    // Jogos da semana contra time de fora que já começaram entram no histórico (com link para o resultado).
+    vsOutside
+      ? supabase
+          .from("games")
+          .select("id, group_id, starts_at, scores, opponent")
+          .eq("group_id", group.id)
+          .not("opponent", "is", null)
+          .lte("starts_at", new Date().toISOString())
+          .returns<Pick<Game, "id" | "group_id" | "starts_at" | "scores" | "opponent">[]>()
+      : Promise.resolve({ data: [] as Pick<Game, "id" | "group_id" | "starts_at" | "scores" | "opponent">[] }),
+  ]);
+  const { upcoming, past } = splitMatches(mergeGameMatches(data ?? [], games ?? []));
   const opponent = typeof adversario === "string" ? adversario : "";
   const sameOpponent = (m: Match) => m.opponent.trim().toLocaleLowerCase("pt-BR") === opponent.toLocaleLowerCase("pt-BR");
   const history = opponent ? past.filter(sameOpponent) : past;
@@ -103,7 +117,13 @@ export default async function MatchesPage({ params, searchParams }: PageProps<"/
           <ul className="divide-y divide-neutral-100">
             {history.map((m) => (
               <li key={m.id} className="py-2">
-                {canEdit ? (
+                {"game_id" in m && m.game_id ? (
+                  // Jogo da semana contra time de fora: placar, gols e craque ficam no resultado do jogo.
+                  <Link href={`/g/${group.id}/jogos/${m.game_id}`} className="block">
+                    <PastSummary match={m} />
+                    <span className="text-xs font-medium text-pitch-700">ver gols e notas ›</span>
+                  </Link>
+                ) : canEdit ? (
                   <details>
                     <summary className="cursor-pointer list-none">
                       <PastSummary match={m} />

@@ -1,4 +1,5 @@
-import type { Match } from "./types";
+import { todayInBrazil } from "./format";
+import type { Game, Match, Team, TeamPlayer } from "./types";
 
 /** Só os dígitos, sem o 55 do Brasil: "(47) 99203-7481" -> "47992037481". */
 export function phoneDigits(input: string): string {
@@ -81,4 +82,61 @@ export function matchRecord(matches: Match[]) {
   }
   const opponents = [...byOpponent.values()].sort((a, b) => b.games - a.games || a.opponent.localeCompare(b.opponent, "pt-BR"));
   return { total, opponents };
+}
+
+/** Nome do adversário limpo (até 60 letras) ou vazio. */
+export function cleanOpponent(input: string | null | undefined): string {
+  return (input ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+/**
+ * Times do jogo contra time de fora: a turma toda (quem jogou) contra o adversário,
+ * que não tem jogadores no app. O placar fica na mesma ordem: nós, eles.
+ */
+export function opponentTeams(groupName: string, opponent: string, players: TeamPlayer[]): Team[] {
+  const us = groupName.trim().slice(0, 30) || "Nós";
+  const them = cleanOpponent(opponent).slice(0, 30) || "Adversário";
+  return [
+    { name: us, players: players.map(({ member_id, name, position }) => ({ member_id, name, position })) },
+    // Nome igual ao nosso confundiria os times (o placar usa o nome como chave na tela).
+    { name: them.toLocaleLowerCase("pt-BR") === us.toLocaleLowerCase("pt-BR") ? `${them} (adv.)` : them, players: [] },
+  ];
+}
+
+/** Adversário do jogo: o salvo no jogo ou, se não tiver, o do amistoso marcado no mesmo dia. */
+export function opponentOf(game: Pick<Game, "starts_at" | "opponent">, matches: Pick<Match, "starts_at" | "opponent">[]): string {
+  const saved = cleanOpponent(game.opponent);
+  if (saved) return saved;
+  const day = todayInBrazil(new Date(game.starts_at));
+  return cleanOpponent(matches.find((m) => todayInBrazil(new Date(m.starts_at)) === day)?.opponent);
+}
+
+/**
+ * Jogos da semana contra time de fora como amistosos do histórico (placar: nós, eles).
+ * O amistoso marcado no mesmo dia contra o mesmo time sai da lista, para não contar duas vezes.
+ */
+export function mergeGameMatches(
+  matches: Match[],
+  games: (Pick<Game, "id" | "group_id" | "starts_at" | "scores" | "opponent">)[],
+): (Match & { game_id?: string })[] {
+  const fromGames = games
+    .filter((g) => cleanOpponent(g.opponent))
+    .map((g) => ({
+      id: g.id,
+      game_id: g.id,
+      group_id: g.group_id,
+      starts_at: g.starts_at,
+      opponent: cleanOpponent(g.opponent),
+      location: "",
+      contact_name: "",
+      contact_phone: "",
+      notes: "",
+      our_score: g.scores?.length === 2 ? g.scores[0] : null,
+      their_score: g.scores?.length === 2 ? g.scores[1] : null,
+      created_at: g.starts_at,
+    }));
+  const key = (m: Pick<Match, "starts_at" | "opponent">) =>
+    `${todayInBrazil(new Date(m.starts_at))}|${m.opponent.trim().toLocaleLowerCase("pt-BR")}`;
+  const taken = new Set(fromGames.map(key));
+  return [...matches.filter((m) => !taken.has(key(m))), ...fromGames];
 }

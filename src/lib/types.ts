@@ -66,6 +66,8 @@ export type Game = {
   teams: Team[] | null;
   /** Gols de cada time, na mesma ordem de `teams`. */
   scores: number[] | null;
+  /** Adversário do dia (formato "contra time de fora"). Antes da migração 20261126000000 vem vazio. */
+  opponent?: string | null;
 };
 
 /** own_goals: gols contra (sem a migração 20261106120000 não vem do banco). */
