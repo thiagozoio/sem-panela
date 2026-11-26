@@ -17,6 +17,8 @@ import { saveLineup, saveMvpVote, saveRatings, saveResult } from "../../actions"
 import { liveOpenForPlayers } from "@/lib/live";
 import { LiveGoals } from "./live-goals";
 import { Scoreboard, TeamRosters, type BoardTeam } from "./scoreboard";
+import { RoundControls, RoundsSummary } from "./rounds";
+import { formatOf, hasRounds, roundGoalsOf, roundLines, type Round } from "@/lib/rounds";
 
 export const metadata: Metadata = { title: "Resultado" };
 
@@ -47,6 +49,14 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   ]);
   if (!gameRow) notFound();
   const { attendances, ...game } = gameRow;
+  // Várias partidas no dia. Sem a migração 20261126000000 a tabela não existe: vale o jogo único.
+  const format = formatOf(group.game_format);
+  let rounds: Round[] | null = null;
+  if (hasRounds(format)) {
+    const { data, error } = await supabase.from("game_rounds").select("*").eq("game_id", gameId).order("seq").returns<Round[]>();
+    if (!error) rounds = data ?? [];
+  }
+  const roundGoals = roundGoalsOf(group.round_goals);
   const started = hasStarted(game.starts_at);
 
   // Quem jogou: os times do jogo (se teve sorteio) ou a lista de confirmados.
@@ -86,7 +96,8 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
 
   // Placar visual e elenco em fichas: cada time com a cor do nome (ou da paleta) e o resultado.
   const sport = sportOf(group.sport);
-  const results = game.teams && game.scores?.length === game.teams.length ? outcomes(game.scores) : null;
+  // Com partidas no dia, vencedor e placar vêm de cada partida (a tabela do dia), não da soma dos gols.
+  const results = !rounds?.length && game.teams && game.scores?.length === game.teams.length ? outcomes(game.scores) : null;
   const colors = teamColors(game.teams?.map((t) => t.name) ?? []);
   const boardTeams: BoardTeam[] =
     game.teams?.map((t, i) => ({
@@ -142,6 +153,11 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
   // Placar ao vivo: aberto nas primeiras horas do jogo; depois fica fechado (dá para usar igual).
   const live = !hasStarted(new Date(new Date(game.starts_at).getTime() + LIVE_HOURS * 3600_000).toISOString());
   const liveTeams = scoreTeams?.map((t) => ({ ...t, players: t.players.filter((p) => playedIds.has(p.member_id)) })) ?? null;
+  // Partidas do dia: precisam de times (do sorteio ou fixos do mês).
+  const roundTeams = (rounds && scoreTeams ? scoreTeams : null)?.map((t, i) => ({
+    name: t.name,
+    color: teamColors(scoreTeams!.map((x) => x.name))[i],
+  }));
 
   // Para corrigir quem jogou: primeiro quem jogou, depois o resto do grupo (convidados no fim).
   const teamIndex = new Map(game.teams?.flatMap((t, i) => t.players.map((p) => [p.member_id, i] as const)) ?? []);
@@ -167,7 +183,9 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
           <p className="text-lg font-bold">{formatGameDate(game.starts_at)}</p>
         </div>
 
-        {results ? (
+        {rounds && roundTeams ? (
+          <RoundsSummary groupId={group.id} gameId={game.id} teams={roundTeams} rounds={rounds} canDelete={canEditResult} />
+        ) : results ? (
           <Scoreboard teams={boardTeams} />
         ) : (
           !hasResult && (
@@ -227,7 +245,16 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
         {(hasResult || craque) && (
           <ShareButtons
             label="Mandar resultado no WhatsApp"
-            text={resultMessage(group.name, game.starts_at, game.teams, game.scores, goalList, craque?.name ?? null, ownGoalList)}
+            text={resultMessage(
+              group.name,
+              game.starts_at,
+              game.teams,
+              game.scores,
+              goalList,
+              craque?.name ?? null,
+              ownGoalList,
+              rounds?.length && game.teams ? roundLines(game.teams.map((t) => t.name), rounds) : undefined,
+            )}
           />
         )}
       </Card>
@@ -244,13 +271,34 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
                     : "Os jogadores já não marcam mais. Só os organizadores corrigem."
                   : "Qualquer um do grupo pode marcar durante o jogo. Combinem quem marca para não contar o mesmo gol duas vezes. Depois do jogo, só o organizador corrige."}
               </p>
+              {rounds && roundTeams && (
+                <RoundControls
+                  groupId={group.id}
+                  gameId={game.id}
+                  format={format}
+                  teams={roundTeams}
+                  rounds={rounds}
+                  roundGoals={roundGoals}
+                />
+              )}
+              {rounds && !roundTeams && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Para anotar as partidas do dia, faça o sorteio dos times (ou monte os times fixos do mês).
+                </p>
+              )}
               <LiveGoals
                 poll={playersLive}
                 groupId={group.id}
                 gameId={game.id}
                 teams={liveTeams}
                 players={played.map((m) => ({ id: m.id, name: m.name }))}
-                initial={{ scores: game.scores, goals: Object.fromEntries(goalsOf), ownGoals: Object.fromEntries(ownGoalsOf) }}
+                initial={{
+                  scores: game.scores,
+                  goals: Object.fromEntries(goalsOf),
+                  ownGoals: Object.fromEntries(ownGoalsOf),
+                  ...(rounds && roundTeams ? { round: rounds.at(-1) ?? null } : {}),
+                }}
+                roundGoals={roundGoals}
               />
             </div>
           </details>
@@ -323,12 +371,16 @@ export default async function GameResultPage({ params }: PageProps<"/g/[id]/jogo
               <input type="hidden" name="game_id" value={game.id} />
               <input type="hidden" name="group_id" value={group.id} />
               {!game.teams && fixedTeams && <input type="hidden" name="use_fixed" value="1" />}
+              {rounds && roundTeams && <input type="hidden" name="keep_scores" value="1" />}
               {!scoreTeams && (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Esse jogo ficou sem times (não teve sorteio), então não tem placar. Dá para anotar os gols de cada jogador.
                 </p>
               )}
-              {scoreTeams && (
+              {rounds && roundTeams && (
+                <p className="text-sm text-neutral-600">O placar vem das partidas do dia (em Marcar gols ao vivo). Aqui você corrige os gols de cada jogador.</p>
+              )}
+              {scoreTeams && !(rounds && roundTeams) && (
                 <div className="flex flex-wrap gap-3">
                   {scoreTeams.map((t, i) => (
                     <label key={t.name} className="text-sm">

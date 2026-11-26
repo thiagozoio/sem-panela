@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/submit";
 import { WEEKDAYS, addMonths, monthLabel, monthStart, todayInBrazil } from "@/lib/format";
 import { SPORTS, sportOf } from "@/lib/sports";
 import { RANKING_MODES, rankingOf } from "@/lib/standings";
+import { GAME_FORMATS, formatOf, roundGoalsOf } from "@/lib/rounds";
 import type { Group } from "@/lib/types";
 import { saveSettings } from "../actions";
 
@@ -46,6 +47,24 @@ export function SettingsForm({ group, disabled }: { group: Group; disabled: bool
           <Select name="ranking" defaultValue={rankingOf(group.ranking)}>
             {RANKING_MODES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label="Formato do jogo"
+          hint="Com várias partidas no dia (ex.: 3 times, jogos de 20 minutos), cada partida é anotada no Resultado e conta na classificação."
+        >
+          <Select name="game_format" defaultValue={formatOf(group.game_format)}>
+            {GAME_FORMATS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Cada partida acaba com" hint="Só vale para várias partidas no dia. Chegou nesse número de gols, a partida fecha sozinha.">
+          <Select name="round_goals" defaultValue={String(roundGoalsOf(group.round_goals) ?? "")}>
+            <option value="">Sem limite de gols (acaba no tempo)</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>{n === 1 ? "1 gol" : `${n} gols`}</option>
             ))}
           </Select>
         </Field>

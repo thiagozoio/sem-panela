@@ -19,6 +19,7 @@ export function LiveGoals({
   teams,
   players,
   initial,
+  roundGoals = null,
 }: {
   /** Vários marcando ao mesmo tempo: atualiza sozinho para ver os gols que os outros marcaram. */
   poll?: boolean;
@@ -29,6 +30,8 @@ export function LiveGoals({
   /** Quem jogou, para o jogo sem times (e quem ficou fora dos times). */
   players: Player[];
   initial: LiveState;
+  /** Várias partidas no dia: gols para acabar a partida (null = sem limite). */
+  roundGoals?: number | null;
 }) {
   const router = useRouter();
   const [state, setState] = useState<LiveState>(initial);
@@ -61,7 +64,7 @@ export function LiveGoals({
   function tap(delta: 1 | -1, target: LiveTarget) {
     setFailed(false);
     setPick(null);
-    setState((s) => applyLiveGoal(s, teams, delta, target));
+    setState((s) => applyLiveGoal(s, teams, delta, target, roundGoals));
     inFlight.current += 1;
     setPending(inFlight.current);
     queue.current = queue.current.then(async () => {
@@ -85,11 +88,16 @@ export function LiveGoals({
 
   const inTeams = new Set(teams?.flatMap((t) => t.players.map((p) => p.member_id)) ?? []);
   const nameOf = new Map(players.map((p) => [p.id, p.name]));
-  const outside = players.filter((p) => !inTeams.has(p.id));
+  // Várias partidas no dia: só os dois times da última partida, e o +1 só com ela rolando.
+  const round = state.round;
+  const rounds = round !== undefined;
+  const closed = rounds && (!round || round.finished);
+  const shown = (i: number) => !rounds || (!!round && (i === round.home || i === round.away));
+  const outside = rounds ? [] : players.filter((p) => !inTeams.has(p.id));
 
   /** Gol contra: com 2 times vai direto para o outro; com mais, pergunta qual time. */
   function ownGoal(memberId: string, delta: 1 | -1) {
-    const options = opponents(teams, memberId);
+    const options = opponents(teams, memberId, state.round);
     if (teams && options.length !== 1) setPick({ memberId, delta });
     else tap(delta, { ownGoal: memberId, team: options[0] ?? -1 });
   }
@@ -106,7 +114,7 @@ export function LiveGoals({
             {goals > 0 && <span className="ml-1 font-semibold text-pitch-700">{"⚽".repeat(Math.min(goals, 5))}{goals > 5 && ` ${goals}`}</span>}
           </span>
           <span className="flex items-center gap-2 text-xs text-neutral-500">
-            <button type="button" onClick={() => ownGoal(p.id, 1)} className="underline underline-offset-2">
+            <button type="button" onClick={() => ownGoal(p.id, 1)} disabled={closed} className="underline underline-offset-2 disabled:no-underline disabled:opacity-40">
               gol contra
             </button>
             {own > 0 && (
@@ -123,7 +131,7 @@ export function LiveGoals({
           <button
             type="button"
             onClick={() => tap(-1, { memberId: p.id })}
-            disabled={goals === 0}
+            disabled={round ? !round.goals[p.id] : goals === 0}
             aria-label={`Tirar um gol de ${p.name}`}
             className="size-10 rounded-xl text-lg font-bold text-neutral-500 ring-1 ring-black/10 transition active:bg-neutral-100 disabled:opacity-30"
           >
@@ -133,8 +141,9 @@ export function LiveGoals({
           <button
             type="button"
             onClick={() => tap(1, { memberId: p.id })}
+            disabled={closed}
             aria-label={`Gol de ${p.name}`}
-            className="h-10 rounded-xl bg-pitch-700 px-3 font-bold text-white transition active:brightness-90"
+            className="h-10 rounded-xl bg-pitch-700 px-3 font-bold text-white transition active:brightness-90 disabled:opacity-30"
           >
             +1 gol
           </button>
@@ -142,7 +151,7 @@ export function LiveGoals({
         {picking && pick && teams && (
           <span className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-neutral-100 px-2 py-1.5 text-xs">
             {pick.delta === 1 ? "Gol contra a favor de:" : "Tirar o gol contra de:"}
-            {opponents(teams, p.id).map((i) => (
+            {opponents(teams, p.id, state.round).map((i) => (
               <button
                 key={teams[i].name}
                 type="button"
@@ -161,9 +170,20 @@ export function LiveGoals({
     );
   };
 
+  if (rounds && !round) {
+    return <p className="text-center text-sm text-neutral-500">Comece a primeira partida para marcar os gols.</p>;
+  }
+
   return (
     <div className="space-y-4">
-      {teams && (
+      {rounds && round && teams && (
+        <p className="text-center text-xs text-neutral-500">
+          {round.finished
+            ? "Partida encerrada. Ainda dá para tirar um gol marcado errado. Para marcar mais, comece a próxima."
+            : `Gols da partida: ${teams[round.home]?.name ?? "?"} ${round.home_score} x ${round.away_score} ${teams[round.away]?.name ?? "?"}`}
+        </p>
+      )}
+      {teams && !rounds && (
         <div className="flex flex-wrap justify-center gap-3 text-center">
           {teams.map((t, i) => (
             <div key={t.name} className="min-w-24 rounded-xl bg-pitch-50 px-3 py-2">
@@ -183,6 +203,7 @@ export function LiveGoals({
       </p>
 
       {teams?.map((t, i) => {
+        if (!shown(i)) return null;
         const roster = t.players.map((p) => ({ id: p.member_id, name: nameOf.get(p.member_id) ?? p.name }));
         return (
           <div key={t.name}>
@@ -193,7 +214,7 @@ export function LiveGoals({
               <button
                 type="button"
                 onClick={() => tap(-1, { team: i })}
-                disabled={!(state.scores?.[i] ?? 0)}
+                disabled={round ? !(i === round.home ? round.home_score : round.away_score) : !(state.scores?.[i] ?? 0)}
                 aria-label={`Tirar um gol do ${t.name}`}
                 className="size-8 rounded-lg font-bold ring-1 ring-black/10 disabled:opacity-30"
               >
@@ -202,8 +223,9 @@ export function LiveGoals({
               <button
                 type="button"
                 onClick={() => tap(1, { team: i })}
+                disabled={closed}
                 aria-label={`Gol sem autor para o ${t.name}`}
-                className="h-8 rounded-lg px-2 font-semibold text-pitch-700 ring-1 ring-pitch-700/30"
+                className="h-8 rounded-lg px-2 font-semibold text-pitch-700 ring-1 ring-pitch-700/30 disabled:opacity-30"
               >
                 +1
               </button>

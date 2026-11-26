@@ -1,6 +1,7 @@
 import { formatDay, monthLabel, monthOf, monthStart, todayInBrazil } from "./format";
 import type { Sport } from "./sports";
 import type { Game, GameGoal } from "./types";
+import type { RoundScore } from "./rounds";
 
 /** Opção do organizador: sem classificação, campeão do mês ou campeonatos com datas. */
 export type RankingMode = "off" | "mensal" | "campeonato";
@@ -45,6 +46,8 @@ export type ResultGame = Pick<Game, "starts_at" | "teams" | "scores"> & {
   game_goals?: Pick<GameGoal, "member_id" | "goals">[];
   /** Presenças do jogo: quem está com "não vai" / "não jogou" não conta nos times. */
   attendances?: { member_id: string; going: boolean }[];
+  /** Partidas do dia (formato com várias partidas): cada uma conta como um jogo na tabela. */
+  rounds?: RoundScore[];
 };
 
 export type Row = {
@@ -156,20 +159,32 @@ export function standings(
   const teams = new Map<string, Row>();
   for (const g of games) {
     if (!hasResult(g)) continue;
-    const result = outcomes(g.scores);
     const fixed = fixedNames(monthOf(g.starts_at));
-    playedTeams(g)!.forEach((team, i) => {
+    const played = playedTeams(g)!;
+    const count = (team: NonNullable<Game["teams"]>[number] | undefined, o: ReturnType<typeof outcomes>[number]) => {
+      if (!team) return;
       for (const p of team.players) {
         const row = players.get(p.member_id) ?? emptyRow(p.member_id, nameOf(p.member_id, p.name));
-        add(row, result[i]);
+        add(row, o);
         players.set(p.member_id, row);
       }
       if (fixed.has(team.name)) {
         const row = teams.get(team.name) ?? emptyRow(team.name, team.name);
-        add(row, result[i]);
+        add(row, o);
         teams.set(team.name, row);
       }
-    });
+    };
+    if (g.rounds?.length) {
+      // Várias partidas no dia: cada partida é um jogo entre os dois times dela.
+      for (const r of g.rounds) {
+        const [h, a] = outcomes([r.home_score, r.away_score]);
+        count(played[r.home], h);
+        count(played[r.away], a);
+      }
+      continue;
+    }
+    const result = outcomes(g.scores);
+    played.forEach((team, i) => count(team, result[i]));
   }
   return { players: [...players.values()].sort(compareRows), teams: [...teams.values()].sort(compareRows) };
 }
