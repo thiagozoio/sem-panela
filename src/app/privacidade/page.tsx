@@ -74,7 +74,8 @@ export default function PrivacyPage() {
         <Section title="Por quanto tempo">
           <p>
             Enquanto você tiver conta ou fizer parte de um grupo. Se você pedir para apagar a conta, removemos seus dados
-            pessoais; o histórico do grupo (por exemplo, um pagamento já registrado) pode ficar sem o seu e-mail.
+            pessoais; o histórico do grupo (por exemplo, um pagamento já registrado) pode ficar sem o seu e-mail. Veja{" "}
+            <Link className="font-medium text-pitch-700 underline" href="/excluir-conta">como excluir sua conta</Link>.
           </p>
         </Section>
         <Section title="Seus direitos">
